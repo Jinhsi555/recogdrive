@@ -1,9 +1,9 @@
 TRAIN_TEST_SPLIT=navtrain
 export NUPLAN_MAP_VERSION="nuplan-maps-v1.0"
-export NUPLAN_MAPS_ROOT="/path/to/NAVSIM/dataset/maps"
-export NAVSIM_EXP_ROOT="/path/to/NAVSIM/exp"
-export NAVSIM_DEVKIT_ROOT="/path/to/NAVSIM/navsim-main"
-export OPENSCENE_DATA_ROOT="/path/to/NAVSIM/dataset"
+export NUPLAN_MAPS_ROOT="/home/zyp/workspace/wlb/recogdrive/dataset/maps/nuplan-maps-v1.0"
+export NAVSIM_EXP_ROOT="/home/zyp/workspace/wlb/recogdrive/exp"
+export NAVSIM_DEVKIT_ROOT="/home/zyp/workspace/wlb/recogdrive"
+export OPENSCENE_DATA_ROOT="/home/zyp/workspace/wlb/recogdrive/dataset"
 CACHE_PATH=$NAVSIM_EXP_ROOT/recogdrive_agent_cache_dir_train
 
 export NCCL_IB_DISABLE=0
@@ -30,5 +30,6 @@ torchrun \
     agent.cache_hidden_state=True \
     agent.cache_mode=True \
     train_test_split=$TRAIN_TEST_SPLIT \
-    agent.vlm_path="/path/to/ReCogDrive_2b" \
-    cache_path=$CACHE_PATH  > caching_dataset.txt 2>&1
+    agent.vlm_path="/home/zyp/workspace/wlb/recogdrive/checkpoints/RecogDrive-VLM-2B" \
+    cache_path=$CACHE_PATH
+    # > caching_dataset.txt 2>&1
