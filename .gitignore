@@ -220,7 +220,8 @@ __marimo__/
 # dir
 checkpoints/
 dataset
-exp/
+exp
+.vscode/*
 
 # file
 *.whl

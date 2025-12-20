@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "RecogDrive cache internvl",
+            "name": "RecogDrive cache qwen3vl",
             "type": "debugpy",
             "request": "launch",
             "module": "torch.distributed.run",
@@ -15,18 +15,19 @@
                 "agent=recogdrive_agent",
                 "experiment_name=recogdrive_agent_cache",
                 "agent.cam_type=single",
-                "agent.cache_hidden_state=True",
+                // "agent.cache_hidden_state=True",
+                "agent.cache_hidden_state=False",
                 "agent.cache_mode=True",
                 "train_test_split=navtest",
-                "agent.vlm_type=internvl",
-                "agent.vlm_path=/home/zyp/workspace/wlb/recogdrive/checkpoints/RecogDrive-VLM-2B",
-                "cache_path=/home/zyp/workspace/wlb/recogdrive/exp/recogdrive_agent_cache_dir_train"
+                "agent.vlm_type=qwen3vl",
+                "agent.vlm_path=/home/zyp/workspace/wlb/recogdrive/checkpoints/Qwen3-VL-2B-Instruct",
+                "cache_path=/home/zyp/workspace/wlb/recogdrive/exp/recogdrive_agent_cache_dir_debug"
             ],
             "env": {
                 "NCCL_IB_DISABLE": "0",
                 "NCCL_P2P_DISABLE": "0",
                 "NCCL_SHM_DISABLE": "0",
-                "PYTHONPATH": "$(pwd):${PYTHONPATH}",
+                "PYTHONPATH": "/home/zyp/workspace/wlb/recogdrive/HunyuanWorld-Mirror:$(pwd):${PYTHONPATH}",
                 "NUPLAN_MAP_VERSION": "nuplan-maps-v1.0",
                 "NUPLAN_MAPS_ROOT": "/home/zyp/workspace/wlb/recogdrive/dataset/maps/nuplan-maps-v1.0",
                 "NAVSIM_EXP_ROOT": "/home/zyp/workspace/wlb/recogdrive/exp",

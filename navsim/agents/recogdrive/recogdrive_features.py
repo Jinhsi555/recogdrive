@@ -4,6 +4,7 @@ import numpy as np
 import gzip
 import pickle
 from PIL import Image
+from pathlib import Path
 
 from navsim.agents.abstract_agent import AgentInput
 from navsim.planning.training.abstract_feature_target_builder import AbstractFeatureBuilder, AbstractTargetBuilder
@@ -11,6 +12,9 @@ from navsim.common.dataclasses import Scene, Trajectory
 from nuplan.planning.simulation.trajectory.trajectory_sampling import TrajectorySampling
 from .recogdrive_backbone import RecogDriveBackbone
 from .utils.internvl_preprocess import load_image
+
+from src.utils.inference_utils import prepare_images_to_tensor
+from src.models.models.worldmirror import WorldMirror
 
 def format_number(n, decimal_places=2):
     return f"{n:+.{decimal_places}f}" if abs(round(n, decimal_places)) > 1e-2 else "0.0"
@@ -40,6 +44,8 @@ class ReCogDriveFeatureBuilder(AbstractFeatureBuilder):
         self.cache_hidden_state = cache_hidden_state
         self.backbone = None
         self.cache_mode = cache_mode
+        self.model_type = model_type
+        self.device = device
 
         if self.cache_hidden_state and self.cache_mode:
             if not model_type or not checkpoint_path:
@@ -49,9 +55,12 @@ class ReCogDriveFeatureBuilder(AbstractFeatureBuilder):
                 checkpoint_path=checkpoint_path,
                 device=device
             )
+        
+        if not self.cache_hidden_state:
+            self.geometry_backbone = WorldMirror.from_pretrained("/home/zyp/workspace/wlb/recogdrive/checkpoints/HunyuanWorld-Mirror").to(device).eval()
 
     def get_unique_name(self) -> str:
-        return "internvl_feature"
+        return f"{self.model_type}_feature"
 
     def compute_features(self, agent_input: AgentInput) -> Dict[str, torch.Tensor]:
 
@@ -77,7 +86,55 @@ class ReCogDriveFeatureBuilder(AbstractFeatureBuilder):
             
             path_tensor = torch.tensor(path_as_ordinals, dtype=torch.long)
             
+            # 3D Geometry model feature cache
+            views = {}
+            imgs = prepare_images_to_tensor([str(cameras[-1].cam_f0.image)]).to(self.device)  # [1,S,3,H,W], in [0,1]
+            # 内参
+            intrinsics_list = [torch.tensor(cameras[-1].cam_f0.intrinsics, dtype=torch.float32, device=self.device)]
+            # 外参
+            c2w = np.eye(4)
+            c2w[:3, :3] = cameras[-1].cam_f0.sensor2lidar_rotation
+            c2w[:3, 3] = cameras[-1].cam_f0.sensor2lidar_translation
+            # w2c = np.linalg.inv(c2w)
+            extrinsics_list = [torch.tensor(c2w, dtype=torch.float32, device=self.device)]
+            
+            views["img"] = imgs
+            views["camera_poses"] = torch.stack(extrinsics_list, dim=0).unsqueeze(0)
+            views["camera_intrs"] = torch.stack(intrinsics_list, dim=0).unsqueeze(0)
+            
+            cond_flags = [1, 0, 1]  # [camera_pose, depth, intrinsics]
+            
+            priors = self.geometry_backbone.extract_priors(views)
+            geometry_features_list, patch_start_idx = self.geometry_backbone.visual_geometry_transformer(views["img"], priors, cond_flags=cond_flags)  # list: [4 * hidden_state], patch_start_idx = 7 (camera_token, register_token*4, pose_token, ray_token)
+            last_geometry_feature = geometry_features_list[-1][:, :, patch_start_idx:]
+            last_geometry_feature = last_geometry_feature.view(-1, 21, 37, last_geometry_feature.shape[-1])
+            
+            # resized_geometry_feature = torch.nn.functional.interpolate(last_geometry_feature.permute(0, 3, 1, 2), size=(32, 64), mode='bilinear')
+            # thumbnail_geometry_feature = torch.nn.functional.interpolate(resized_geometry_feature, size=(16, 16), mode='bilinear')
+            # B, C, H, W = resized_geometry_feature.shape
+            
+            # patch_feature = []
+            # blocks = 2 * 4
+            # for i in range(blocks):
+            #     # 计算边界框 (left, upper, right, lower)
+            #     col = i % (64 // 16)  # 列索引: i % 4
+            #     row = i // (64 // 16)  # 行索引: i // 4
+                
+            #     left = col * 16
+            #     upper = row * 16
+            #     right = left + 16
+            #     lower = upper + 16
+                
+            #     split_feature_map = resized_geometry_feature[:, :, upper:lower, left:right]
+            #     patch_feature.append(split_feature_map.reshape(B, split_feature_map.shape[1], -1))
+                
+            # patch_feature.append(thumbnail_geometry_feature.reshape(B, split_feature_map.shape[1], -1))
+            # geometry_feature = torch.stack(patch_feature, dim=-1).view(B, C, -1) 
+            # geometry_feature = geometry_feature.permute(0, 2, 1).contiguous()
+            
+            
             return {
+                "geometry_features": last_geometry_feature.cpu(),
                 "history_trajectory": history_trajectory.cpu(),
                 "high_command_one_hot": high_command_one_hot.cpu(),
                 "status_feature": status_feature.cpu(),
@@ -87,29 +144,76 @@ class ReCogDriveFeatureBuilder(AbstractFeatureBuilder):
             if self.backbone is None:
                 raise RuntimeError("FeatureBuilder is in online mode, but the backbone was not initialized.")
             
-            pixel_values = load_image(str(cameras[-1].cam_f0.image)).unsqueeze(0)
+            if self.backbone.model_type == 'internvl':
+                pixel_values = load_image(str(cameras[-1].cam_f0.image)).unsqueeze(0)
+                pixel_values_squeezed = pixel_values.squeeze(1)
+                num_patches_list = [pv.shape[0] for pv in pixel_values_squeezed]
+                pixel_values_cat = torch.cat(list(pixel_values_squeezed), dim=0)
 
-            pixel_values_squeezed = pixel_values.squeeze(1)
-            num_patches_list = [pv.shape[0] for pv in pixel_values_squeezed]
-            pixel_values_cat = torch.cat(list(pixel_values_squeezed), dim=0)
+                navigation_commands = ['turn left', 'go straight', 'turn right']
+                command_str = next((navigation_commands[i] for i, v in enumerate(high_command_one_hot) if v == 1), "unknown")
+                history_str = " ".join([f'   - t-{3-i}: ({format_number(history_trajectory[i, 0].item())}, {format_number(history_trajectory[i, 1].item())}, {format_number(history_trajectory[i, 2].item())})' for i in range(4)])
+                
+                prompt = f"<image>\nAs an autonomous driving system, predict the vehicle's trajectory based on:\n1. Visual perception from front camera view\n2. Historical motion context (last 4 timesteps):{history_str}\n3. Active navigation command: [{command_str.upper()}]"
+                output_requirements = "\nOutput requirements:\n- Predict 8 future trajectory points\n- Each point format: (x:float, y:float, heading:float)\n- Use [PT, ...] to encapsulate the trajectory\n- Maintain numerical precision to 2 decimal places"
+                questions = [f"{prompt}{output_requirements}"]
 
-            navigation_commands = ['turn left', 'go straight', 'turn right']
-            command_str = next((navigation_commands[i] for i, v in enumerate(high_command_one_hot) if v == 1), "unknown")
-            history_str = " ".join([f'   - t-{3-i}: ({format_number(history_trajectory[i, 0].item())}, {format_number(history_trajectory[i, 1].item())}, {format_number(history_trajectory[i, 2].item())})' for i in range(4)])
-            
-            prompt = f"<image>\nAs an autonomous driving system, predict the vehicle's trajectory based on:\n1. Visual perception from front camera view\n2. Historical motion context (last 4 timesteps):{history_str}\n3. Active navigation command: [{command_str.upper()}]"
-            output_requirements = "\nOutput requirements:\n- Predict 8 future trajectory points\n- Each point format: (x:float, y:float, heading:float)\n- Use [PT, ...] to encapsulate the trajectory\n- Maintain numerical precision to 2 decimal places"
-            questions = [f"{prompt}{output_requirements}"]
+                # TODO 这里是 language model 的输出，需要修改为 vision model 的输出
+                outputs = self.backbone(pixel_values_cat.cuda(), questions, num_patches_list=num_patches_list, agent_input=agent_input)
+                last_hidden_state = outputs.hidden_states[-1]
+                # vision_backbone_output = outputs.vit_embeds
+                
+                # # 3D Geometry model feature cache
+                # views = {}
+                # imgs = prepare_images_to_tensor([str(cameras[-1].cam_f0.image)]).to(self.device)  # [1,S,3,H,W], in [0,1]
+                # # 内参
+                # intrinsics_list = [torch.tensor(cameras[-1].cam_f0.intrinsics, dtype=torch.float32, device=self.device)]
+                # # 外参
+                # c2w = np.eye(4)
+                # c2w[:3, :3] = cameras[-1].cam_f0.sensor2lidar_rotation
+                # c2w[:3, 3] = cameras[-1].cam_f0.sensor2lidar_translation
+                # # w2c = np.linalg.inv(c2w)
+                # extrinsics_list = [torch.tensor(c2w, dtype=torch.float32, device=self.device)]
+                
+                # views["img"] = imgs
+                # views["camera_poses"] = torch.stack(extrinsics_list, dim=0).unsqueeze(0)
+                # views["camera_intrs"] = torch.stack(intrinsics_list, dim=0).unsqueeze(0)
+                
+                # cond_flags = [1, 0, 1]  # [camera_pose, depth, intrinsics]
+                
+                # priors = self.geometry_backbone.extract_priors(views)
+                # geometry_features_list, patch_start_idx = self.geometry_backbone.visual_geometry_transformer(views["img"], priors, cond_flags=cond_flags)  # list: [4 * hidden_state], patch_start_idx = 7 (camera_token, register_token*4, pose_token, ray_token)
+                # last_geometry_feature = geometry_features_list[-1][:, :, patch_start_idx:]
+                
+                # resized_geometry_feature = torch.nn.functional.interpolate(last_geometry_feature, size=(32, 64), mode='bilinear')
+                
+                return {
+                    # "geometry_features": resized_geometry_feature.cpu(),  # [1, 1, patch_token_len, dim]
+                    "history_trajectory": history_trajectory.cpu(),
+                    "high_command_one_hot": high_command_one_hot.cpu(),
+                    "last_hidden_state": last_hidden_state.squeeze(0).float().cpu(),
+                    "status_feature": status_feature.cpu(),
+                }
+                
+            else:
+                pixel_values = None
+                navigation_commands = ['turn left', 'go straight', 'turn right']
+                command_str = next((navigation_commands[i] for i, v in enumerate(high_command_one_hot) if v == 1), "unknown")
+                history_str = " ".join([f'   - t-{3-i}: ({format_number(history_trajectory[i, 0].item())}, {format_number(history_trajectory[i, 1].item())}, {format_number(history_trajectory[i, 2].item())})' for i in range(4)])
+                
+                prompt = f"As an autonomous driving system, predict the vehicle's trajectory based on:\n1. Visual perception from front camera view\n2. Historical motion context (last 4 timesteps):{history_str}\n3. Active navigation command: [{command_str.upper()}]"
+                output_requirements = "\nOutput requirements:\n- Predict 8 future trajectory points\n- Each point format: (x:float, y:float, heading:float)\n- Use [PT, ...] to encapsulate the trajectory\n- Maintain numerical precision to 2 decimal places"
+                questions = [f"{prompt}{output_requirements}"]
+                
+                outputs = self.backbone(pixel_values, questions, num_patches_list=None, agent_input=agent_input)
+                last_hidden_state = outputs.hidden_states[-1]
 
-            outputs = self.backbone(pixel_values_cat.cuda(), questions, num_patches_list=num_patches_list)
-            last_hidden_state = outputs.hidden_states[-1]
-
-            return {
-                "history_trajectory": history_trajectory.cpu(),
-                "high_command_one_hot": high_command_one_hot.cpu(),
-                "last_hidden_state": last_hidden_state.squeeze(0).float().cpu(),
-                "status_feature": status_feature.cpu(),
-            }
+                return {
+                    "history_trajectory": history_trajectory.cpu(),
+                    "high_command_one_hot": high_command_one_hot.cpu(),
+                    "last_hidden_state": last_hidden_state.squeeze(0).float().cpu(),
+                    "status_feature": status_feature.cpu(),
+                }
 
 
 class TrajectoryTargetBuilder(AbstractTargetBuilder):
