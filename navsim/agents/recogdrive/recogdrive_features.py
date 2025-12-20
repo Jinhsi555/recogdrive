@@ -56,7 +56,7 @@ class ReCogDriveFeatureBuilder(AbstractFeatureBuilder):
                 device=device
             )
         
-        if not self.cache_hidden_state:
+        if not self.cache_hidden_state and self.cache_mode:
             self.geometry_backbone = WorldMirror.from_pretrained("/home/zyp/workspace/wlb/recogdrive/checkpoints/HunyuanWorld-Mirror").to(device).eval()
 
     def get_unique_name(self) -> str:

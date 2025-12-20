@@ -14,6 +14,7 @@ dit_type: 'small'
 sampling_method: 'ddim'
 cache_mode: False
 cache_hidden_state: True
+freeze_backbone: True
 metric_cache_path: ''
 reference_policy_checkpoint: ''
 vlm_size: 'large'

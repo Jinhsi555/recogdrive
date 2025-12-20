@@ -31,6 +31,7 @@ class RecogDriveBackbone(nn.Module):
     """
     def __init__(self,
                  model_type: str,
+                 cache_hidden_state: bool,
                  checkpoint_path: str,
                  device: str = "cuda"):
         """
@@ -46,6 +47,7 @@ class RecogDriveBackbone(nn.Module):
         self.model = None
         self.tokenizer = None  
         self.model_type = model_type.lower()
+        self.cache_hidden_state = cache_hidden_state
         self.device = device
 
         print(f"Initializing backbone of type: '{self.model_type}' from path: '{checkpoint_path}'")
@@ -93,7 +95,7 @@ class RecogDriveBackbone(nn.Module):
         self.model.img_context_token_id = self.img_context_token_id
         print("InternVL model configured.")
     
-    def forward(self, pixel_values: torch.Tensor, questions: List[str], num_patches_list: List[int], agent_input: AgentInput = None):
+    def forward(self, pixel_values: torch.Tensor, questions: List[str], num_patches_list: List[int] = None, agent_input: AgentInput = None):
         if not self.model:
             raise RuntimeError("Backbone model has not been initialized. Call initialize() on the agent first.")
             
@@ -137,9 +139,13 @@ class RecogDriveBackbone(nn.Module):
             )
         
         elif self.model_type == 'qwen3vl':
-            question = questions[0]
-            cameras = agent_input.cameras
-            image_path = str(cameras[-1].cam_f0.image)
+            if self.cache_hidden_state:
+                question = questions[0]
+                cameras = agent_input.cameras
+                image_path = str(cameras[-1].cam_f0.image)
+            else:
+                question = questions[0]
+                image_path = str(pixel_values[0])
             
             messages = [
                 {

@@ -38,5 +38,48 @@
             "cwd": "/home/zyp/workspace/wlb/recogdrive",
             "justMyCode": false,
         },
+        {
+            "name": "run_recogdrive_train_multi_node_ema",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "torch.distributed.run",
+            "args": [
+                "--nproc_per_node=8",
+                "/home/zyp/workspace/wlb/recogdrive/navsim/planning/script/run_training_recogdrive_ema.py",
+                "agent=recogdrive_agent",
+                "agent.lr=1e-4",
+                "agent.grpo=False",
+                "agent.vlm_path='/home/zyp/workspace/wlb/recogdrive/checkpoints/Qwen3-VL-2B-Instruct'",
+                "agent.cam_type='single'",
+                "agent.cache_hidden_state=False",
+                "agent.cache_mode=False",
+                "agent.freeze_backbone=True",
+                "agent.vlm_type='qwen3vl'",
+                "agent.dit_type='small'",
+                "agent.sampling_method='ddim'",
+                "trainer.params.max_epochs=100",
+                "trainer.params.devices=8",
+                "dataloader.params.batch_size=1",
+                "experiment_name=training_recogdrive_agent",
+                "train_test_split=navtrain",
+                "cache_path=/home/zyp/workspace/wlb/recogdrive/exp/recogdrive_agent_cache_dir_train_qwen3vl_worldmirror_no_hidden_state",
+                "use_cache_without_dataset=True",
+                "force_cache_computation=False"
+            ],
+            "env": {
+                "NCCL_IB_DISABLE": "0",
+                "NCCL_P2P_DISABLE": "0",
+                "NCCL_SHM_DISABLE": "0",
+                "PYTHONPATH": "/home/zyp/workspace/wlb/recogdrive/HunyuanWorld-Mirror:$(pwd):${PYTHONPATH}",
+                "NUPLAN_MAP_VERSION": "nuplan-maps-v1.0",
+                "NUPLAN_MAPS_ROOT": "/home/zyp/workspace/wlb/recogdrive/dataset/maps/nuplan-maps-v1.0",
+                "NAVSIM_EXP_ROOT": "/home/zyp/workspace/wlb/recogdrive/exp",
+                "NAVSIM_DEVKIT_ROOT": "/home/zyp/workspace/wlb/recogdrive",
+                "OPENSCENE_DATA_ROOT": "/home/zyp/workspace/wlb/recogdrive/dataset"
+            },
+            "console": "integratedTerminal",
+            "cwd": "/home/zyp/workspace/wlb/recogdrive",
+            "justMyCode": false,
+        }
     ]
 }

@@ -34,6 +34,7 @@ torchrun \
     agent.vlm_path='/path/to/pretrain_model' \
     agent.cam_type='single' \
     agent.cache_hidden_state=True \
+    agent.cache_mode=True \
     agent.vlm_type="internvl" \
     agent.dit_type="small" \
     agent.sampling_method="ddim" \

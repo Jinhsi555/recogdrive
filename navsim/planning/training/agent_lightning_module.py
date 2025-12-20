@@ -64,7 +64,18 @@ class AgentLightningModule(pl.LightningModule):
     def configure_optimizers(self):
         """Inherited, see superclass."""
         return self.agent.get_optimizers()
-
+    
+    def on_train_start(self):
+        # 打印所有参数及其 requires_grad 状态
+        for name, param in self.named_parameters():
+            print(f"{name}: requires_grad={param.requires_grad}, shape={param.shape}")
+        
+        # 打印优化器参数
+        optimizer = self.optimizers()
+        param_groups = optimizer.param_groups
+        print(f"优化器参数组数量: {len(param_groups)}")
+        for i, group in enumerate(param_groups):
+            print(f"组 {i}: {len(group['params'])} 个参数")
 
 class AgentLightningDiT(pl.LightningModule):
     """Pytorch lightning wrapper for learnable agent."""
