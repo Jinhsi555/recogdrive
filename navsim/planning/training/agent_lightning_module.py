@@ -32,16 +32,52 @@ class AgentLightningModule(pl.LightningModule):
         
         return loss
     
+    # def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+    #     """
+    #     每次保存 checkpoint 时，只保留 state_dict 中不以 'agent.model' 开头的条目。
+    #     """
+    #     filtered_sd = {
+    #         k: v
+    #         for k, v in checkpoint['state_dict'].items()
+    #         if not k.startswith('agent.model')
+    #     }
+    #     checkpoint['state_dict'] = filtered_sd
+    
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
         """
-        每次保存 checkpoint 时，只保留 state_dict 中不以 'agent.model' 开头的条目。
+        智能保存检查点：
+        1. 始终保存 action_head 全部参数
+        2. 保存 backbone 中需要梯度的参数（解冻层）
+        3. 过滤掉 backbone 中冻结的预训练参数以节省空间
+        4. 保留其他必要参数（如优化器状态等）
         """
+        
+        print("💾 正在保存检查点...")
+        state_dict = checkpoint['state_dict']
+        
         filtered_sd = {
             k: v
-            for k, v in checkpoint['state_dict'].items()
-            if not k.startswith('agent.model')
+            for k, v in state_dict.items()
+            if not k.startswith('agent.backbone.model.model.visual')
         }
         checkpoint['state_dict'] = filtered_sd
+        
+        # 统计信息
+        original_size = sum(t.numel() for t in state_dict.values())
+        saved_size = sum(t.numel() for t in filtered_sd.values())
+        saved_params = len(filtered_sd)
+        original_params = len(state_dict)
+        
+        print(f"📊 检查点压缩: {saved_params}/{original_params} 个参数")
+        print(f"📦 空间节省: {saved_size}/{original_size:,} 元素 ({saved_size/original_size:.1%})")
+        
+        # 打印保存的 backbone 层（调试用）
+        backbone_keys = [k for k in filtered_sd.keys() if 'backbone' in k]
+        if backbone_keys:
+            print("🔓 保存的 backbone 层:")
+            for k in sorted(backbone_keys):
+                print(f"  - {k}")
+
 
     def training_step(self, batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]], batch_idx: int) -> Tensor:
         """

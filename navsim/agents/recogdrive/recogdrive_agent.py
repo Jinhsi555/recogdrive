@@ -59,6 +59,7 @@ class ReCogDriveAgent(AbstractAgent):
         self.reference_policy_checkpoint = reference_policy_checkpoint
         self.vlm_size = vlm_size
         self.freeze_backbone = freeze_backbone
+        self.trainable_layers = trainable_layers  # 解冻指定层
         
         local_rank = int(os.getenv("LOCAL_RANK", "0"))
         device = f"cuda:{local_rank}"
@@ -75,7 +76,7 @@ class ReCogDriveAgent(AbstractAgent):
             )
             
             if self.freeze_backbone:
-                self._freeze_backbone()
+                self._freeze_backbone_selective()
 
         if self.dit_type == "large":
             cfg = make_recogdrive_config(self.dit_type, action_dim=3, action_horizon=8, grpo=self.grpo, input_embedding_dim=1536,sampling_method=sampling_method)
@@ -261,6 +262,7 @@ class ReCogDriveAgent(AbstractAgent):
 
                 outputs = self.backbone(pixel_values_list, questions)
                 last_hidden_state = outputs.hidden_states[-1]
+                alignment_feature = outputs.hidden_states[-7]
 
         status_feature = features["status_feature"].cuda()
         if status_feature.ndim == 1: status_feature = status_feature.unsqueeze(0)
@@ -268,6 +270,8 @@ class ReCogDriveAgent(AbstractAgent):
 
         history_trajectory_reshaped = history_trajectory.view(history_trajectory.size(0), -1)
         input_state = torch.cat([status_feature, history_trajectory_reshaped], dim=1)
+        
+        geometry_feature = features["geometry_feature"].cuda()
 
         if self.training and not self.grpo:
             action_inputs = BatchFeature(data={"state": input_state.to(model_dtype), "his_traj": history_trajectory_reshaped.to(model_dtype), "status_feature": status_feature.to(model_dtype), "action": targets["trajectory"].to(model_dtype)})
@@ -321,13 +325,56 @@ class ReCogDriveAgent(AbstractAgent):
             return torch.nn.functional.l1_loss(predictions["pred_traj"], targets["trajectory"])
 
     def get_optimizers(self) -> Union[Optimizer, Dict[str, LRScheduler]]:
-        optimizer_cfg = DictConfig(dict(type="AdamW", lr=self._lr, weight_decay=1e-4, betas=(0.9, 0.95)))
-        optimizer = build_from_configs(optim, optimizer_cfg, params=self.action_head.parameters())
+        """
+        pack all trainable parameters into optimizer
+        """
+        action_head_params = []
+        backbone_params = []
         
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                if "backbone" in name:
+                    backbone_params.append(param)
+                elif "action_head" in name:
+                    action_head_params.append(param)
+        
+        # 构建参数组（不同学习率）
+        param_groups = []
+        
+        # Backbone 参数组（使用较低学习率，通常为 0.1 * base_lr）
+        if backbone_params:
+            param_groups.append({
+                'params': backbone_params,
+                'lr': self._lr * 0.1,  # backbone 学习率较低
+                'weight_decay': 1e-4,
+            })
+            print(f"✅ Backbone 参数组: {len(backbone_params)} 个参数，学习率={self._lr * 0.1:.2e}")
+        
+        # Action Head 参数组（使用基础学习率）
+        if action_head_params:
+            param_groups.append({
+                'params': action_head_params,
+                'lr': self._lr,  # action head 使用基础学习率
+                'weight_decay': 1e-4,
+            })
+            print(f"✅ Action Head 参数组: {len(action_head_params)} 个参数，学习率={self._lr:.2e}")
+        
+        # 如果没有可训练参数，则抛出异常（理论上不会发生）
+        if not param_groups:
+            raise RuntimeError("No trainable parameters found.")
+        
+        # 创建优化器（直接使用 AdamW，因为需要参数组功能）
+        optimizer = torch.optim.AdamW(
+            param_groups,
+            betas=(0.9, 0.95),
+            # 注意：这里不再传递 lr 和 weight_decay，因为它们已在参数组中指定
+        )
+        
+        # 调度器保持不变，它会自动对所有参数组应用相同的调度策略
         if self.grpo:
             scheduler = WarmupCosLR(optimizer=optimizer, lr=self._lr, min_lr=0.0, epochs=10, warmup_epochs=0)
         else:
-            scheduler = WarmupCosLR(optimizer=optimizer, lr=self._lr, min_lr=1e-6, epochs=200, warmup_epochs=3)
+            scheduler = WarmupCosLR(optimizer=optimizer, lr=self._lr, min_lr=1e-6, epochs=100, warmup_epochs=3)
             
         return {'optimizer': optimizer, 'lr_scheduler': scheduler}
 

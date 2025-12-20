@@ -44,7 +44,7 @@
             "request": "launch",
             "module": "torch.distributed.run",
             "args": [
-                "--nproc_per_node=8",
+                "--nproc_per_node=1",
                 "/home/zyp/workspace/wlb/recogdrive/navsim/planning/script/run_training_recogdrive_ema.py",
                 "agent=recogdrive_agent",
                 "agent.lr=1e-4",
@@ -58,7 +58,7 @@
                 "agent.dit_type='small'",
                 "agent.sampling_method='ddim'",
                 "trainer.params.max_epochs=100",
-                "trainer.params.devices=8",
+                "trainer.params.devices=1",
                 "dataloader.params.batch_size=1",
                 "experiment_name=training_recogdrive_agent",
                 "train_test_split=navtrain",
@@ -80,6 +80,7 @@
             "console": "integratedTerminal",
             "cwd": "/home/zyp/workspace/wlb/recogdrive",
             "justMyCode": false,
+            "subProcess": true
         }
     ]
 }

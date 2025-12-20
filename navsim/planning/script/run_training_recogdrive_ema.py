@@ -73,6 +73,7 @@ def custom_collate_fn(
         image_path_tensor = None
     else:
         last_hidden_state = None
+        geometry_feature = torch.stack([features['geometry_features'] for features in features_list], dim=0).cpu()
         image_path_tensor = torch.stack([features['image_path_tensor'] for features in features_list], dim=0).cpu()
 
     trajectory = torch.stack([targets['trajectory'] for targets in targets_list], dim=0).cpu()
@@ -82,7 +83,8 @@ def custom_collate_fn(
         'high_command_one_hot': high_command_one_hot,
         'last_hidden_state': last_hidden_state,
         'status_feature': status_feature,
-        'image_path_tensor': image_path_tensor
+        'image_path_tensor': image_path_tensor,
+        'geometry_feature': geometry_feature,
     }
 
     targets = {
@@ -189,13 +191,13 @@ def main(cfg: DictConfig) -> None:
             cache_path=cfg.cache_path,
             feature_builders=agent.get_feature_builders(),
             target_builders=agent.get_target_builders(),
-            log_names=cfg.train_logs,
+            log_names=cfg.train_logs[:5],
         )
         val_data = CacheOnlyDataset(
             cache_path=cfg.cache_path,
             feature_builders=agent.get_feature_builders(),
             target_builders=agent.get_target_builders(),
-            log_names=cfg.val_logs,
+            log_names=cfg.val_logs[:50],
         )
     else:
         logger.info("Building SceneLoader")

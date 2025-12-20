@@ -155,10 +155,11 @@ class ReCogDriveDiffusionPlanner(nn.Module):
             hidden_size=config.input_embedding_dim,
         )
         if config.vlm_size == "large":
-            # self.feature_encoder = nn.Linear(3584, config.input_embedding_dim)
-            self.feature_encoder = nn.Linear(2048, config.input_embedding_dim)
+            # self.feature_encoder = nn.Linear(3584, config.input_embedding_dim)  # internvl
+            self.feature_encoder = nn.Linear(2048, config.input_embedding_dim)  # qwen3vl
         else:
-            self.feature_encoder = nn.Linear(1536, config.input_embedding_dim)
+            # self.feature_encoder = nn.Linear(1536, config.input_embedding_dim)
+            self.feature_encoder = nn.Linear(2048, config.input_embedding_dim)
             
         self.fusion_projector = nn.Linear(config.input_embedding_dim * 3, config.input_embedding_dim)
 
