@@ -36,7 +36,7 @@ torchrun \
     agent.grpo=False \
     agent.vlm_path='/home/zyp/workspace/wlb/recogdrive/checkpoints/Qwen3-VL-2B-Instruct' \
     agent.cam_type='single' \
-    agent.cache_hidden_state=True \
+    agent.cache_hidden_state=False \
     agent.cache_mode=False \
     agent.freeze_backbone=True \
     agent.vlm_type="qwen3vl" \

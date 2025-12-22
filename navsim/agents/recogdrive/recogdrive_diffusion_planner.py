@@ -530,9 +530,10 @@ class ReCogDriveDiffusionPlanner(nn.Module):
         align_loss = 0
         bsz = alignment_feature.shape[0]
         for _vision, _vggt in zip(alignment_feature, geometry_feature):
-            _vision = torch.nn.functional.normalize(_vision, dim=-1)
-            _vggt = torch.nn.functional.normalize(_vggt, dim=-1)
-            align_loss += 1 - torch.mean(_vision * _vggt).sum(dim=-1).mean()  # Cosine similarity loss
+            vision_norm = torch.nn.functional.normalize(_vision, dim=-1)
+            geom_norm = torch.nn.functional.normalize(_vggt, dim=-1)
+            cosine_sim = torch.sum(vision_norm * geom_norm, dim=-1)  # (B, P)
+            align_loss += 1 - torch.mean(cosine_sim)  # Cosine similarity loss
         align_loss /= bsz  # Average over batch size
         return align_loss
         
