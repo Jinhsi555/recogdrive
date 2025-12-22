@@ -15,7 +15,7 @@ sampling_method: 'ddim'
 cache_mode: False
 cache_hidden_state: True
 freeze_backbone: True
-trainable_layers: ['language_model']
+trainable_layers: ['language_model', 'merger']
 metric_cache_path: ''
 reference_policy_checkpoint: ''
 vlm_size: 'large'

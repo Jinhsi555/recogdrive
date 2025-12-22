@@ -34,11 +34,17 @@ def custom_collate_fn(
     high_command_one_hot = torch.stack([features['high_command_one_hot'] for features in features_list], dim=0).cpu()
     status_feature = torch.stack([features['status_feature'] for features in features_list], dim=0).cpu()
 
-    last_hidden_state = rnn_utils.pad_sequence(
-        [features['last_hidden_state'] for features in features_list],
-        batch_first=True,
-        padding_value=0.0
-    ).clone().detach()
+    if features_list[0].get('last_hidden_state') is not None:
+        last_hidden_state = rnn_utils.pad_sequence(
+            [features['last_hidden_state'] for features in features_list],
+            batch_first=True,
+            padding_value=0.0
+        ).clone().detach()
+        image_path_tensor = None
+    else:
+        last_hidden_state = None
+        geometry_feature = torch.stack([features['geometry_features'] for features in features_list], dim=0).cpu().detach()
+        image_path_tensor = torch.stack([features['image_path_tensor'] for features in features_list], dim=0).cpu()
 
     trajectory = torch.stack([targets['trajectory'] for targets in targets_list], dim=0).cpu()
 
@@ -46,7 +52,9 @@ def custom_collate_fn(
         'history_trajectory': history_trajectory,
         'high_command_one_hot': high_command_one_hot,
         'last_hidden_state': last_hidden_state,
-        'status_feature': status_feature
+        'status_feature': status_feature,
+        'image_path_tensor': image_path_tensor,
+        'geometry_feature': geometry_feature,
     }
 
     targets = {

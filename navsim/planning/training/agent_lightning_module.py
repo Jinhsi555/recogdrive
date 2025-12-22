@@ -53,30 +53,30 @@ class AgentLightningModule(pl.LightningModule):
         """
         
         print("💾 正在保存检查点...")
-        state_dict = checkpoint['state_dict']
+        # state_dict = checkpoint['state_dict']
         
-        filtered_sd = {
-            k: v
-            for k, v in state_dict.items()
-            if not k.startswith('agent.backbone.model.model.visual')
-        }
-        checkpoint['state_dict'] = filtered_sd
+        # filtered_sd = {
+        #     k: v
+        #     for k, v in state_dict.items()
+        #     if not k.startswith('agent.backbone.model.model.visual')
+        # }
+        # checkpoint['state_dict'] = filtered_sd
         
-        # 统计信息
-        original_size = sum(t.numel() for t in state_dict.values())
-        saved_size = sum(t.numel() for t in filtered_sd.values())
-        saved_params = len(filtered_sd)
-        original_params = len(state_dict)
+        # # 统计信息
+        # original_size = sum(t.numel() for t in state_dict.values())
+        # saved_size = sum(t.numel() for t in filtered_sd.values())
+        # saved_params = len(filtered_sd)
+        # original_params = len(state_dict)
         
-        print(f"📊 检查点压缩: {saved_params}/{original_params} 个参数")
-        print(f"📦 空间节省: {saved_size}/{original_size:,} 元素 ({saved_size/original_size:.1%})")
+        # print(f"📊 检查点压缩: {saved_params}/{original_params} 个参数")
+        # print(f"📦 空间节省: {saved_size}/{original_size:,} 元素 ({saved_size/original_size:.1%})")
         
-        # 打印保存的 backbone 层（调试用）
-        backbone_keys = [k for k in filtered_sd.keys() if 'backbone' in k]
-        if backbone_keys:
-            print("🔓 保存的 backbone 层:")
-            for k in sorted(backbone_keys):
-                print(f"  - {k}")
+        # # 打印保存的 backbone 层（调试用）
+        # backbone_keys = [k for k in filtered_sd.keys() if 'backbone' in k]
+        # if backbone_keys:
+        #     print("🔓 保存的 backbone 层:")
+        #     for k in sorted(backbone_keys):
+        #         print(f"  - {k}")
 
 
     def training_step(self, batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]], batch_idx: int) -> Tensor:

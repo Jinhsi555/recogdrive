@@ -39,13 +39,13 @@
             "justMyCode": false,
         },
         {
-            "name": "run_recogdrive_train_multi_node_ema",
+            "name": "run_recogdrive_train_multi_node",
             "type": "debugpy",
             "request": "launch",
             "module": "torch.distributed.run",
             "args": [
                 "--nproc_per_node=1",
-                "/home/zyp/workspace/wlb/recogdrive/navsim/planning/script/run_training_recogdrive_ema.py",
+                "/home/zyp/workspace/wlb/recogdrive/navsim/planning/script/run_training_recogdrive.py",
                 "agent=recogdrive_agent",
                 "agent.lr=1e-4",
                 "agent.grpo=False",

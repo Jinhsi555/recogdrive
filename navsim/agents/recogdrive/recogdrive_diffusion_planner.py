@@ -464,6 +464,17 @@ class ReCogDriveDiffusionPlanner(nn.Module):
         ego_status_features = self.ego_status_encoder(action_input.status_feature)
         
         gt_actions = self.norm_odo(action_input.action)
+        
+        alignment_feature = action_input.alignment_feature
+        geometry_feature = action_input.geometry_feature
+        B, N, H, W, C = geometry_feature.shape
+        geometry_feature = geometry_feature.permute(0, 1, 4, 2, 3).view(B*N, C, H, W)
+        
+        # interpolate the geometry feature map to match the size of alignment feature map
+        geometry_feature = F.interpolate(geometry_feature, size=(34, 60), mode='bilinear', align_corners=True).permute(0, 2, 3, 1).view(B*N, -1, C)
+        
+        # compute alignment loss
+        align_loss = self.compute_alignment_loss(geometry_feature, alignment_feature)
 
         if self.config.sampling_method == 'flow':
             noise = torch.randn_like(gt_actions)
@@ -509,9 +520,22 @@ class ReCogDriveDiffusionPlanner(nn.Module):
             model_output = self.model(fused_input, vl_embeds, ego_status_features, t_discrete)
             pred_noise = self.action_decoder(model_output)
             loss = F.mse_loss(pred_noise, noise, reduction='mean')
-
+        
+        # add alignment loss
+        loss += 0.5 * align_loss
+        
         return BatchFeature(data={"loss": loss})
 
+    def compute_alignment_loss(self, geometry_feature: torch.Tensor, alignment_feature: torch.Tensor) -> torch.Tensor:
+        align_loss = 0
+        bsz = alignment_feature.shape[0]
+        for _vision, _vggt in zip(alignment_feature, geometry_feature):
+            _vision = torch.nn.functional.normalize(_vision, dim=-1)
+            _vggt = torch.nn.functional.normalize(_vggt, dim=-1)
+            align_loss += 1 - torch.mean(_vision * _vggt).sum(dim=-1).mean()  # Cosine similarity loss
+        align_loss /= bsz  # Average over batch size
+        return align_loss
+        
     def get_action(
         self,
         vl_features: torch.Tensor,

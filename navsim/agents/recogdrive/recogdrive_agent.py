@@ -260,9 +260,13 @@ class ReCogDriveAgent(AbstractAgent):
                     )
                     questions.append(f"{prompt}{output_requirements}")
 
-                outputs = self.backbone(pixel_values_list, questions)
+                outputs, visual_feature_idx = self.backbone(pixel_values_list, questions)
                 last_hidden_state = outputs.hidden_states[-1]
-                alignment_feature = outputs.hidden_states[-7]
+                
+                # Get the alignment feature (index the visual token)
+                start_index = visual_feature_idx[0]
+                end_index = visual_feature_idx[-1]
+                alignment_feature = outputs.hidden_states[-7][:, start_index:end_index+1, :]  # align the 3/4 layer (21/28) with the geometry feature
 
         status_feature = features["status_feature"].cuda()
         if status_feature.ndim == 1: status_feature = status_feature.unsqueeze(0)
@@ -274,7 +278,14 @@ class ReCogDriveAgent(AbstractAgent):
         geometry_feature = features["geometry_feature"].cuda()
 
         if self.training and not self.grpo:
-            action_inputs = BatchFeature(data={"state": input_state.to(model_dtype), "his_traj": history_trajectory_reshaped.to(model_dtype), "status_feature": status_feature.to(model_dtype), "action": targets["trajectory"].to(model_dtype)})
+            action_inputs = BatchFeature(data={
+                "state": input_state.to(model_dtype), 
+                "his_traj": history_trajectory_reshaped.to(model_dtype), 
+                "status_feature": status_feature.to(model_dtype), 
+                "action": targets["trajectory"].to(model_dtype),
+                "alignment_feature": alignment_feature.to(model_dtype),
+                "geometry_feature": geometry_feature.to(model_dtype),
+            })
             return self.action_head(last_hidden_state, action_inputs)
         elif self.training and self.grpo:
             action_inputs = BatchFeature(data={"state": input_state.to(model_dtype), "his_traj": history_trajectory_reshaped.to(model_dtype), "status_feature": status_feature.to(model_dtype), "action": targets["trajectory"].to(model_dtype)})

@@ -1,8 +1,9 @@
 export NUPLAN_MAP_VERSION="nuplan-maps-v1.0"
-export NUPLAN_MAPS_ROOT="/path/to/NAVSIM/dataset/maps"
-export NAVSIM_EXP_ROOT="/path/to/NAVSIM/exp"
-export NAVSIM_DEVKIT_ROOT="/path/to/NAVSIM/navsim-main"
-export OPENSCENE_DATA_ROOT="/path/to/NAVSIM/dataset"
+export NUPLAN_MAPS_ROOT="/home/zyp/workspace/wlb/recogdrive/dataset/maps/nuplan-maps-v1.0"
+export NAVSIM_EXP_ROOT="/home/zyp/workspace/wlb/recogdrive/exp"    
+export NAVSIM_DEVKIT_ROOT="/home/zyp/workspace/wlb/recogdrive"
+export OPENSCENE_DATA_ROOT="/home/zyp/workspace/wlb/recogdrive/dataset"
+export PYTHONPATH="/home/zyp/workspace/wlb/recogdrive/HunyuanWorld-Mirror:/home/zyp/workspace/wlb/recogdrive:${PYTHONPATH}"
 TRAIN_TEST_SPLIT=navtrain
 export NCCL_IB_DISABLE=0
 export NCCL_P2P_DISABLE=0
@@ -15,31 +16,37 @@ GPUS_PER_NODE=${GPUS_PER_NODE:-8}
 NODES=$((GPUS / GPUS_PER_NODE))
 export MASTER_PORT=${MASTER_PORT}
 export PORT=${PORT}
+export HYDRA_FULL_ERROR=1  # 启用全量错误日志
+export TORCH_DISTRIBUTED_DEBUG=DETAIL
+export NCCL_TIMEOUT=36000
 
 echo "GPUS: ${GPUS}"
 export CUDA_LAUNCH_BLOCKING=1
 
-
+# --nnodes=4 \
+# --node_rank=$MLP_ROLE_INDEX \
+# --master_port=$MLP_WORKER_0_PORT \
+# --master_addr=$MLP_WORKER_0_HOST \
 
 torchrun \
-    --nnodes=4 \
-    --node_rank=$MLP_ROLE_INDEX \
-    --master_addr=$MLP_WORKER_0_HOST \
     --nproc_per_node=${GPUS} \
-    --master_port=$MLP_WORKER_0_PORT \
     $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_recogdrive.py \
     agent=recogdrive_agent \
     agent.lr=1e-4 \
     agent.grpo=False \
-    agent.vlm_path='/path/to/pretrain_model' \
+    agent.vlm_path='/home/zyp/workspace/wlb/recogdrive/checkpoints/Qwen3-VL-2B-Instruct' \
     agent.cam_type='single' \
     agent.cache_hidden_state=True \
-    agent.vlm_type="internvl" \
+    agent.cache_mode=False \
+    agent.freeze_backbone=True \
+    agent.vlm_type="qwen3vl" \
     agent.dit_type="small" \
     agent.sampling_method="ddim" \
-    trainer.params.max_epochs=200 \
-    experiment_name=training_internvl_agent_dit \
+    trainer.params.max_epochs=10 \
+    dataloader.params.batch_size=1 \
+    experiment_name=training_qwen3vl_backbone_agent_dit \
     train_test_split=$TRAIN_TEST_SPLIT \
-    cache_path="/path/to/recogdrive_agent_cache_dir_train" \
+    cache_path="/home/zyp/workspace/wlb/recogdrive/exp/recogdrive_agent_cache_dir_train_qwen3vl_worldmirror_no_hidden_state" \
     use_cache_without_dataset=True \
-    force_cache_computation=False > train_recogdrive_exp.txt 2>&1
+    force_cache_computation=False
+    # > train_recogdrive_exp.txt 2>&1

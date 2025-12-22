@@ -178,5 +178,5 @@ class RecogDriveBackbone(nn.Module):
                     **inputs,
                     output_hidden_states=True,
                     return_dict=True,
-            )
+            ), torch.where(inputs.input_ids == 151655)[1]
     
