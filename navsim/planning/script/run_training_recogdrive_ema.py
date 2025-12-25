@@ -71,6 +71,7 @@ def custom_collate_fn(
             padding_value=0.0
         ).clone().detach()
         image_path_tensor = None
+        geometry_feature = None
     else:
         last_hidden_state = None
         geometry_feature = torch.stack([features['geometry_features'] for features in features_list], dim=0).cpu().detach()

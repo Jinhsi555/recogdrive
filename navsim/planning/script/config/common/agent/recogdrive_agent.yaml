@@ -7,6 +7,7 @@ trajectory_sampling:
   time_horizon: 4
   interval_length: 0.5
 checkpoint_path: ''
+vlm_checkpoint: ''
 vlm_path: ''
 cam_type: 'single'
 vlm_type: 'internvl'
@@ -14,10 +15,11 @@ dit_type: 'small'
 sampling_method: 'ddim'
 cache_mode: False
 cache_hidden_state: True
-freeze_backbone: True
+freeze_backbone: False
 trainable_layers: ['language_model', 'merger']
 metric_cache_path: ''
 reference_policy_checkpoint: ''
 vlm_size: 'large'
 grpo: False
 lr: 1e-4
+evaluation: False

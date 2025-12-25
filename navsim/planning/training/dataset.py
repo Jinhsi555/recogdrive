@@ -21,6 +21,17 @@ logger = logging.getLogger(__name__)
 
 def load_feature_target_from_pickle(path: Path) -> Dict[str, torch.Tensor]:
     """Helper function to load pickled feature/target from path."""
+    try:
+        with gzip.open(path, 'rb') as f:
+            data_dict: Dict[str, torch.Tensor] = pickle.load(f)
+            return data_dict
+    except (EOFError, pickle.UnpicklingError, gzip.BadGzipFile) as e:
+        print(f"加载失败，跳过文件: {path}, 错误: {e}")
+        # 返回空字典或抛出异常
+        raise
+    except Exception as e:
+        print(f"未知错误加载文件 {path}: {e}")
+        raise    
     with gzip.open(path, "rb") as f:
         data_dict: Dict[str, torch.Tensor] = pickle.load(f)
     return data_dict

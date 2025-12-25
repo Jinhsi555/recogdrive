@@ -11,7 +11,7 @@ Classifier: Operating System :: OS Independent
 Classifier: License :: Free for non-commercial use
 Requires-Python: >=3.9
 License-File: LICENSE
-Requires-Dist: nuplan-devkit@ git+https://githubfast.com/motional/nuplan-devkit/@nuplan-devkit-v1.2
+Requires-Dist: nuplan-devkit@ git+https://github.com/motional/nuplan-devkit/@nuplan-devkit-v1.2
 Requires-Dist: positional-encodings==6.0.1
 Requires-Dist: aioboto3
 Requires-Dist: aiofiles

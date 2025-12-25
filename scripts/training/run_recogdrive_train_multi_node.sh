@@ -1,9 +1,9 @@
 export NUPLAN_MAP_VERSION="nuplan-maps-v1.0"
-export NUPLAN_MAPS_ROOT="/home/zyp/workspace/wlb/recogdrive/dataset/maps/nuplan-maps-v1.0"
-export NAVSIM_EXP_ROOT="/home/zyp/workspace/wlb/recogdrive/exp"    
-export NAVSIM_DEVKIT_ROOT="/home/zyp/workspace/wlb/recogdrive"
-export OPENSCENE_DATA_ROOT="/home/zyp/workspace/wlb/recogdrive/dataset"
-export PYTHONPATH="/home/zyp/workspace/wlb/recogdrive/HunyuanWorld-Mirror:/home/zyp/workspace/wlb/recogdrive:${PYTHONPATH}"
+export NUPLAN_MAPS_ROOT="/mnt/data/data/wlb/ReCogDrive_github/dataset/maps/nuplan-maps-v1.0"
+export NAVSIM_EXP_ROOT="/mnt/data/data/wlb/ReCogDrive_github/exp"
+export NAVSIM_DEVKIT_ROOT="/mnt/data/data/wlb/ReCogDrive_github"
+export OPENSCENE_DATA_ROOT="/mnt/data/data/wlb/ReCogDrive_github/dataset"
+export PYTHONPATH="/mnt/data/data/wlb/ReCogDrive_github/HunyuanWorld-Mirror:/mnt/data/data/wlb/ReCogDrive_github:${PYTHONPATH}"
 TRAIN_TEST_SPLIT=navtrain
 export NCCL_IB_DISABLE=0
 export NCCL_P2P_DISABLE=0
@@ -34,7 +34,7 @@ torchrun \
     agent=recogdrive_agent \
     agent.lr=1e-4 \
     agent.grpo=False \
-    agent.vlm_path='/home/zyp/workspace/wlb/recogdrive/checkpoints/Qwen3-VL-2B-Instruct' \
+    agent.vlm_path='/mnt/data/data/wlb/Qwen3-VL-2B-Instruct' \
     agent.cam_type='single' \
     agent.cache_hidden_state=False \
     agent.cache_mode=False \
@@ -44,9 +44,9 @@ torchrun \
     agent.sampling_method="ddim" \
     trainer.params.max_epochs=10 \
     dataloader.params.batch_size=1 \
-    experiment_name=training_qwen3vl_backbone_agent_dit \
+    experiment_name=training_qwen3vl_backbone_agent_dit_new_cache \
     train_test_split=$TRAIN_TEST_SPLIT \
-    cache_path="/home/zyp/workspace/wlb/recogdrive/exp/recogdrive_agent_cache_dir_train_qwen3vl_worldmirror_no_hidden_state" \
+    cache_path="/mnt/data/data/wlb/ReCogDrive_github/exp/recogdrive_agent_cache_dir_train_qwen3vl_worldmirror_no_hidden_state" \
     use_cache_without_dataset=True \
     force_cache_computation=False
     # > train_recogdrive_exp.txt 2>&1

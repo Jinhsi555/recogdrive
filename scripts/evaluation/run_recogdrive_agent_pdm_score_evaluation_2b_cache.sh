@@ -8,8 +8,8 @@ export NAVSIM_EXP_ROOT="/mnt/data/data/wlb/ReCogDrive_github/exp"
 export NAVSIM_DEVKIT_ROOT="/mnt/data/data/wlb/ReCogDrive_github"
 export OPENSCENE_DATA_ROOT="/mnt/data/data/wlb/ReCogDrive_github/dataset"
 export PYTHONPATH="/mnt/data/data/wlb/ReCogDrive_github/HunyuanWorld-Mirror:/mnt/data/data/wlb/ReCogDrive_github:${PYTHONPATH}"
-export NCCL_IB_DISABLE=0
-export NCCL_P2P_DISABLE=0
+export NCCL_IB_DISABLE=1
+export NCCL_P2P_DISABLE=1
 export NCCL_SHM_DISABLE=0
 
 MASTER_PORT=${MASTER_PORT:-63669}
@@ -22,6 +22,9 @@ export PORT=${PORT}
 
 echo "GPUS: ${GPUS}"
 export CUDA_LAUNCH_BLOCKING=1
+export NCCL_TIMEOUT=3600
+export HYDRA_FULL_ERROR=1  # 启用全量错误日志
+export TORCH_DISTRIBUTED_DEBUG=DETAIL
 
 
 CHECKPOINT="/mnt/data/data/wlb/ReCogDrive_github/exp/training_recogdrive_agent_qwen3vl_worldmirror_alignment_5epoch/2025.12.24.18.57.16/lightning_logs/version_0/checkpoints/epoch=83-step=55860.ckpt"
@@ -35,11 +38,10 @@ CHECKPOINT="/mnt/data/data/wlb/ReCogDrive_github/exp/training_recogdrive_agent_q
 
 torchrun \
     --nproc_per_node=8 \
-    $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_recogdrive.py \
+    $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_cache.py \
     train_test_split=$TRAIN_TEST_SPLIT \
     agent=recogdrive_agent \
     agent.checkpoint_path="'$CHECKPOINT'" \
-    agent.vlm_checkpoint="'/mnt/data/data/wlb/ReCogDrive_github/exp/training_qwen3vl_backbone_agent_dit_alignment_10epoch/2025.12.23.16.31.18/lightning_logs/version_0/checkpoints/epoch=6-step=74473.ckpt'" \
     agent.vlm_path='/mnt/data/data/wlb/Qwen3-VL-2B-Instruct' \
     agent.cam_type='single' \
     agent.grpo=False \
@@ -49,8 +51,7 @@ torchrun \
     agent.dit_type="small" \
     agent.vlm_size="small" \
     agent.sampling_method="ddim" \
-    agent.is_evaluation=True \
-    cache_path="/mnt/data/data/wlb/ReCogDrive_github/exp/recogdrive_agent_cache_dir_test_qwen3vl_worldmirror_alignment_5epoch" \
+    cache_path="/mnt/data/data/wlb/ReCogDrive_github/exp/recogdrive_agent_cache_dir_test_qwen3vl_worldmirror_alignment_10epoch" \
     experiment_name=recogdrive_agent_eval \
     agent.evaluation=True
 

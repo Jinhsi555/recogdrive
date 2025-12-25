@@ -29,6 +29,7 @@ class ReCogDriveAgent(AbstractAgent):
         self,
         trajectory_sampling: TrajectorySampling,
         vlm_path: Optional[str] = None,
+        vlm_checkpoint: Optional[str] = None,
         checkpoint_path: Optional[str] = None,
         cam_type: Optional[str] = 'single', 
         vlm_type: Optional[str] = 'internvl', 
@@ -43,10 +44,12 @@ class ReCogDriveAgent(AbstractAgent):
         vlm_size: Optional[str] = 'large',
         freeze_backbone: bool = False,
         trainable_layers: Optional[List[str]] = None,  # 可训练层名称列表
+        evaluation: bool = False,
     ):
         super().__init__()
         self._trajectory_sampling = trajectory_sampling
         self.vlm_path = vlm_path
+        self.vlm_checkpoint = vlm_checkpoint
         self.checkpoint_path = checkpoint_path
         self.vlm_type = vlm_type
         self.dit_type = dit_type
@@ -60,6 +63,7 @@ class ReCogDriveAgent(AbstractAgent):
         self.vlm_size = vlm_size
         self.freeze_backbone = freeze_backbone
         self.trainable_layers = trainable_layers  # 解冻指定层
+        self.evaluation = evaluation
         
         local_rank = int(os.getenv("LOCAL_RANK", "0"))
         device = f"cuda:{local_rank}"
@@ -77,6 +81,11 @@ class ReCogDriveAgent(AbstractAgent):
             
             if self.freeze_backbone:
                 self._freeze_backbone_selective()
+            else:
+                self.initialize()
+                
+        if self.evaluation:
+            self.feature_builders = self.get_feature_builders()
 
         if self.dit_type == "large":
             cfg = make_recogdrive_config(self.dit_type, action_dim=3, action_horizon=8, grpo=self.grpo, input_embedding_dim=1536,sampling_method=sampling_method)
@@ -144,7 +153,7 @@ class ReCogDriveAgent(AbstractAgent):
                     filtered_ckpt[k2] = v
             self.load_state_dict(filtered_ckpt, strict=False)
             
-        if self.freeze_backbone:
+        if not self.freeze_backbone:
             self._freeze_backbone()
 
     def get_sensor_config(self) -> SensorConfig:
@@ -154,13 +163,25 @@ class ReCogDriveAgent(AbstractAgent):
         return [TrajectoryTargetBuilder(trajectory_sampling=self._trajectory_sampling)]
 
     def get_feature_builders(self) -> List[AbstractFeatureBuilder]:
-        return [ReCogDriveFeatureBuilder(
+        feature_builders = ReCogDriveFeatureBuilder(
             cache_hidden_state=self.cache_hidden_state,
             model_type=self.vlm_type,
             checkpoint_path=self.vlm_path,
             device=self.device,
             cache_mode=self.cache_mode,
-        )]
+        )
+        if self.vlm_checkpoint:
+            ckpt = torch.load(self.vlm_checkpoint, map_location=self.device)["state_dict"]
+            filtered_ckpt = {}
+            for k, v in ckpt.items():
+                full_name = k.split('agent.backbone.')[-1]
+                filtered_ckpt[full_name] = v
+            feature_builders.backbone.load_state_dict(filtered_ckpt, strict=False)
+            for name, param in feature_builders.backbone.named_parameters():
+                param.requires_grad = False
+            feature_builders.backbone.eval()
+            print(f"✅ Feature Builder loaded from checkpoint: {self.checkpoint_path}")
+        return [feature_builders]
 
     def forward(self, features: Dict[str, torch.Tensor], targets=None, tokens_list=None) -> Dict[str, torch.Tensor]:
         for key, tensor in features.items():
@@ -275,9 +296,8 @@ class ReCogDriveAgent(AbstractAgent):
         history_trajectory_reshaped = history_trajectory.view(history_trajectory.size(0), -1)
         input_state = torch.cat([status_feature, history_trajectory_reshaped], dim=1)
         
-        geometry_feature = features["geometry_feature"].cuda()
-
-        if self.training and not self.grpo:
+        if features.get("geometry_feature") is not None:
+            geometry_feature = features["geometry_feature"].cuda()
             action_inputs = BatchFeature(data={
                 "state": input_state.to(model_dtype), 
                 "his_traj": history_trajectory_reshaped.to(model_dtype), 
@@ -286,6 +306,15 @@ class ReCogDriveAgent(AbstractAgent):
                 "alignment_feature": alignment_feature.to(model_dtype),
                 "geometry_feature": geometry_feature.to(model_dtype),
             })
+        elif self.training:
+            action_inputs = BatchFeature(data={
+                "state": input_state.to(model_dtype), 
+                "his_traj": history_trajectory_reshaped.to(model_dtype), 
+                "status_feature": status_feature.to(model_dtype), 
+                "action": targets["trajectory"].to(model_dtype),
+            })
+
+        if self.training and not self.grpo:
             return self.action_head(last_hidden_state, action_inputs)
         elif self.training and self.grpo:
             action_inputs = BatchFeature(data={"state": input_state.to(model_dtype), "his_traj": history_trajectory_reshaped.to(model_dtype), "status_feature": status_feature.to(model_dtype), "action": targets["trajectory"].to(model_dtype)})
@@ -299,10 +328,14 @@ class ReCogDriveAgent(AbstractAgent):
 
         features: Dict[str, torch.Tensor] = {}
         # build features
-        for builder in self.get_feature_builders():
-            features.update(builder.compute_features(agent_input))
-        # add batch dimension
-        features = {k: v.unsqueeze(0) for k, v in features.items()}
+        if not self.evaluation:
+            for builder in self.feature_builders:
+                features.update(builder.compute_features(agent_input))
+        
+            # add batch dimension
+            features = {k: v.unsqueeze(0) for k, v in features.items()}
+        else:
+            features = agent_input
 
         with torch.no_grad():
             predictions = self.forward(features)
