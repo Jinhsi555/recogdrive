@@ -23,6 +23,7 @@ from .recogdrive_diffusion_planner import (
     ReCogDriveDiffusionPlannerConfig,
 )
 
+from peft import LoraConfig, get_peft_model
 
 class ReCogDriveAgent(AbstractAgent):
     def __init__(
@@ -45,6 +46,11 @@ class ReCogDriveAgent(AbstractAgent):
         freeze_backbone: bool = False,
         trainable_layers: Optional[List[str]] = None,  # 可训练层名称列表
         evaluation: bool = False,
+        # ======= LoRA 相关配置 ======= 
+        use_lora: bool = False,
+        lora_rank: int = 8,
+        lora_dropout: float = 0.1,
+        lora_target_modules: Optional[List[str]] = None,
     ):
         super().__init__()
         self._trajectory_sampling = trajectory_sampling
@@ -64,6 +70,11 @@ class ReCogDriveAgent(AbstractAgent):
         self.freeze_backbone = freeze_backbone
         self.trainable_layers = trainable_layers  # 解冻指定层
         self.evaluation = evaluation
+        # ======= LoRA 相关配置 ======= 
+        self.use_lora = use_lora
+        self.lora_rank = lora_rank
+        self.lora_dropout = lora_dropout
+        self.lora_target_modules = lora_target_modules
         
         local_rank = int(os.getenv("LOCAL_RANK", "0"))
         device = f"cuda:{local_rank}"
@@ -79,8 +90,9 @@ class ReCogDriveAgent(AbstractAgent):
                 device=device
             )
             
-            if self.freeze_backbone:
-                self._freeze_backbone_selective()
+            if self.use_lora:
+                self.backbone = self._apply_lora_to_backbone(self.backbone)
+                self._freeze_backbone_for_lora()
             else:
                 self.initialize()
                 
@@ -105,6 +117,48 @@ class ReCogDriveAgent(AbstractAgent):
     def name(self) -> str:
         return self.__class__.__name__
     
+    def _apply_lora_to_backbone(self, backbone):
+        """Apply LoRA to the backbone."""
+        lora_config = LoraConfig(
+            r=self.lora_rank,
+            lora_alpha=2*self.lora_rank,
+            target_modules=self.lora_target_modules,
+            lora_dropout=self.lora_dropout,
+            bias="none",
+        )
+        lora_backbone = get_peft_model(backbone, lora_config)
+        print("✅ LoRA applied to backbone.")
+        
+        # List the LoRA adapter applied to the backbone
+        for name, module in lora_backbone.named_modules():
+            if "lora" in name:
+                print(f"    - {name}")
+        
+        return lora_backbone
+    
+    def _freeze_backbone_for_lora(self):
+        if self.backbone is None:
+            return
+        
+        if self.use_lora:
+            # LoRA mode: freeze all parameters except LoRA adapter
+            for name, param in self.backbone.named_parameters():
+                if "lora" not in name:
+                    param.requires_grad = False
+                else:
+                    param.requires_grad = True
+            
+            self.backbone.eval()
+            
+            # Print trainable parameter statistics
+            print("Trainable parameters in LoRA backbone:")
+            trainable_params = sum(p.numel() for p in self.backbone.parameters() if p.requires_grad)
+            total_params = sum(p.numel() for p in self.backbone.parameters())
+            print(f"Trainable parameters: {trainable_params:,} / {total_params:,} ({trainable_params/total_params:.2%})")
+        else:
+            self._freeze_backbone_selective()
+            
+            
     def _freeze_backbone(self):
         """冻结backbone所有参数"""
         if self.backbone is None:
@@ -374,10 +428,13 @@ class ReCogDriveAgent(AbstractAgent):
         """
         action_head_params = []
         backbone_params = []
+        lora_params = []
         
         for name, param in self.named_parameters():
             if param.requires_grad:
-                if "backbone" in name:
+                if "lora" in name.lower():
+                    lora_params.append(param)
+                elif "backbone" in name:
                     backbone_params.append(param)
                 elif "action_head" in name:
                     action_head_params.append(param)
@@ -385,11 +442,20 @@ class ReCogDriveAgent(AbstractAgent):
         # 构建参数组（不同学习率）
         param_groups = []
         
-        # Backbone 参数组（使用较低学习率，通常为 0.1 * base_lr）
+        # ====== 新增：LoRA参数组（使用较高学习率） ======
+        if lora_params:
+            param_groups.append({
+                'params': lora_params,
+                'lr_scale': 1.0,  # LoRA通常使用较高学习率
+                'weight_decay': 1e-4,
+            })
+            print(f"✅ LoRA 参数组: {len(lora_params)} 个参数，学习率={self._lr:.2e}")
+        
+        # Backbone 参数组（非LoRA部分，通常冻结）
         if backbone_params:
             param_groups.append({
                 'params': backbone_params,
-                'lr': self._lr * 0.1,  # backbone 学习率较低
+                'lr_scale': 0.1,
                 'weight_decay': 1e-4,
             })
             print(f"✅ Backbone 参数组: {len(backbone_params)} 个参数，学习率={self._lr * 0.1:.2e}")
@@ -398,7 +464,7 @@ class ReCogDriveAgent(AbstractAgent):
         if action_head_params:
             param_groups.append({
                 'params': action_head_params,
-                'lr': self._lr,  # action head 使用基础学习率
+                'lr_scale': 1.0,
                 'weight_decay': 1e-4,
             })
             print(f"✅ Action Head 参数组: {len(action_head_params)} 个参数，学习率={self._lr:.2e}")
@@ -407,20 +473,53 @@ class ReCogDriveAgent(AbstractAgent):
         if not param_groups:
             raise RuntimeError("No trainable parameters found.")
         
-        # 创建优化器（直接使用 AdamW，因为需要参数组功能）
+        # 创建优化器
         optimizer = torch.optim.AdamW(
             param_groups,
             betas=(0.9, 0.95),
-            # 注意：这里不再传递 lr 和 weight_decay，因为它们已在参数组中指定
         )
         
-        # 调度器保持不变，它会自动对所有参数组应用相同的调度策略
+        # 调度器
         if self.grpo:
             scheduler = WarmupCosLR(optimizer=optimizer, lr=self._lr, min_lr=0.0, epochs=10, warmup_epochs=0)
         else:
-            scheduler = WarmupCosLR(optimizer=optimizer, lr=self._lr, min_lr=1e-6, epochs=100, warmup_epochs=3)
+            scheduler = WarmupCosLR(optimizer=optimizer, lr=self._lr, min_lr=1e-6, epochs=10, warmup_epochs=0)
             
         return {'optimizer': optimizer, 'lr_scheduler': scheduler}
+
+    def verify_lora_activation(self):
+        """
+        验证LoRA参数是否确实可训练
+        """
+        print("=== LoRA配置验证 ===")
+        print(f"使用LoRA: {self.use_lora}")
+        
+        if self.backbone is None:
+            print("Backbone未初始化")
+            return
+        
+        # 统计参数
+        total_params = 0
+        trainable_params = 0
+        lora_params = 0
+        
+        for name, param in self.backbone.named_parameters():
+            total_params += param.numel()
+            if param.requires_grad:
+                trainable_params += param.numel()
+                if "lora" in name.lower():
+                    lora_params += param.numel()
+        
+        print(f"Backbone总参数: {total_params:,}")
+        print(f"可训练参数: {trainable_params:,} ({trainable_params/total_params*100:.4f}%)")
+        print(f"其中LoRA参数: {lora_params:,}")
+        
+        # 列出LoRA模块
+        print("\nLoRA模块列表:")
+        for name, module in self.backbone.named_modules():
+            if hasattr(module, "lora_A") or hasattr(module, "lora_B"):
+                print(f"  - {name}")
+
 
     @staticmethod
     def _decode_paths_from_tensor(path_tensor: torch.Tensor) -> List[str]:

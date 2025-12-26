@@ -53,14 +53,14 @@ class AgentLightningModule(pl.LightningModule):
         """
         
         print("💾 正在保存检查点...")
-        # state_dict = checkpoint['state_dict']
+        state_dict = checkpoint['state_dict']
         
-        # filtered_sd = {
-        #     k: v
-        #     for k, v in state_dict.items()
-        #     if not k.startswith('agent.backbone.model.model.visual')
-        # }
-        # checkpoint['state_dict'] = filtered_sd
+        filtered_sd = {
+            k: v
+            for k, v in state_dict.items()
+            if 'lora' in k or 'action_head' in k
+        }
+        checkpoint['state_dict'] = filtered_sd
         
         # # 统计信息
         # original_size = sum(t.numel() for t in state_dict.values())
@@ -70,14 +70,6 @@ class AgentLightningModule(pl.LightningModule):
         
         # print(f"📊 检查点压缩: {saved_params}/{original_params} 个参数")
         # print(f"📦 空间节省: {saved_size}/{original_size:,} 元素 ({saved_size/original_size:.1%})")
-        
-        # # 打印保存的 backbone 层（调试用）
-        # backbone_keys = [k for k in filtered_sd.keys() if 'backbone' in k]
-        # if backbone_keys:
-        #     print("🔓 保存的 backbone 层:")
-        #     for k in sorted(backbone_keys):
-        #         print(f"  - {k}")
-
 
     def training_step(self, batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]], batch_idx: int) -> Tensor:
         """
@@ -102,11 +94,10 @@ class AgentLightningModule(pl.LightningModule):
         return self.agent.get_optimizers()
     
     def on_train_start(self):
-        # 打印所有参数及其 requires_grad 状态
+        # 所有参数及其 requires_grad 状态
         for name, param in self.named_parameters():
             print(f"{name}: requires_grad={param.requires_grad}, shape={param.shape}")
         
-        # 打印优化器参数
         optimizer = self.optimizers()
         param_groups = optimizer.param_groups
         print(f"优化器参数组数量: {len(param_groups)}")

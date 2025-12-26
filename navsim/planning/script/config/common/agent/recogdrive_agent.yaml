@@ -23,3 +23,7 @@ vlm_size: 'large'
 grpo: False
 lr: 1e-4
 evaluation: False
+use_lora: False
+lora_rank: 8
+lora_dropout: 0.1
+lora_target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
