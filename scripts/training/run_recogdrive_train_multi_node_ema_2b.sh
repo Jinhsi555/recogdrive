@@ -35,10 +35,11 @@ torchrun \
     agent.lr=1e-4 \
     agent.grpo=False \
     agent.vlm_path='/mnt/data/data/wlb/Qwen3-VL-2B-Instruct' \
+    agent.checkpoint_path="'/mnt/data/data/wlb/ReCogDrive_github/exp/training_qwen3vl_backbone_agent_dit_alignment_10epoch_LoRA_batchsize_8/2025.12.26.03.37.55/lightning_logs/version_0/checkpoints/epoch=9-step=106390.ckpt'" \
     agent.cam_type='single' \
     agent.cache_hidden_state=True \
-    agent.cache_mode=True \
-    agent.freeze_backbone=True \
+    agent.cache_mode=False \
+    agent.freeze_backbone=False \
     agent.vlm_type="qwen3vl" \
     agent.dit_type="small" \
     agent.vlm_size="small" \
@@ -46,9 +47,9 @@ torchrun \
     trainer.params.max_epochs=100 \
     trainer.params.num_nodes=1 \
     trainer.params.devices=8 \
-    experiment_name=training_recogdrive_agent_qwen3vl_worldmirror_alignment_10epoch \
+    experiment_name=training_recogdrive_agent_qwen3vl_worldmirror_alignment_10epoch_LoRA_batchsize_128 \
     train_test_split=$TRAIN_TEST_SPLIT \
-    cache_path="/mnt/data/data/wlb/ReCogDrive_github/exp/recogdrive_agent_cache_dir_train_qwen3vl_worldmirror_alignment_10epoch" \
+    cache_path="/mnt/data/data/wlb/ReCogDrive_github/exp/recogdrive_agent_cache_dir_train_qwen3vl_worldmirror_alignment_10epoch_LoRA_batchsize_8" \
     use_cache_without_dataset=True \
     force_cache_computation=False
     # > train_recogdrive_exp_ema_2b.txt &

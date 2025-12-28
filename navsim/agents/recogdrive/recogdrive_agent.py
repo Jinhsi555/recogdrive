@@ -93,6 +93,8 @@ class ReCogDriveAgent(AbstractAgent):
             if self.use_lora:
                 self.backbone = self._apply_lora_to_backbone(self.backbone)
                 self._freeze_backbone_for_lora()
+                if self.evaluation:
+                    self.initialize()
             else:
                 self.initialize()
                 
@@ -206,6 +208,7 @@ class ReCogDriveAgent(AbstractAgent):
                 if k2 in model_dict and v.shape == model_dict[k2].shape:
                     filtered_ckpt[k2] = v
             self.load_state_dict(filtered_ckpt, strict=False)
+            print(f"✅ Agent action head loaded from checkpoint: {self.checkpoint_path}")
             
         if not self.freeze_backbone:
             self._freeze_backbone()
@@ -224,17 +227,24 @@ class ReCogDriveAgent(AbstractAgent):
             device=self.device,
             cache_mode=self.cache_mode,
         )
-        if self.vlm_checkpoint:
-            ckpt = torch.load(self.vlm_checkpoint, map_location=self.device)["state_dict"]
-            filtered_ckpt = {}
-            for k, v in ckpt.items():
-                full_name = k.split('agent.backbone.')[-1]
-                filtered_ckpt[full_name] = v
-            feature_builders.backbone.load_state_dict(filtered_ckpt, strict=False)
-            for name, param in feature_builders.backbone.named_parameters():
-                param.requires_grad = False
-            feature_builders.backbone.eval()
-            print(f"✅ Feature Builder loaded from checkpoint: {self.checkpoint_path}")
+        if feature_builders.backbone:
+            feature_builders.backbone = self._apply_lora_to_backbone(feature_builders.backbone)
+            if self.checkpoint_path:
+                adapter_ckpt = torch.load(self.checkpoint_path, map_location=self.device)['state_dict']
+                filtered_ckpt = {}
+                for k, v in adapter_ckpt.items():
+                    full_name = k.split('agent.backbone.')[-1]
+                    filtered_ckpt[full_name] = v
+                # feature_builders.backbone.load_state_dict(filtered_ckpt, strict=False)
+                
+                missing_keys, unexpected_keys = feature_builders.backbone.load_state_dict(filtered_ckpt, strict=False)
+                for name, param in feature_builders.backbone.named_parameters():
+                    param.requires_grad = False
+                feature_builders.backbone.eval()
+                print(f"✅ Feature Builder loaded from checkpoint: {self.checkpoint_path}")
+                print("LoRA adapter loaded successfully")
+                # print(f" - Missing keys: {missing_keys}")
+                # print(f" - Unexpected keys: {unexpected_keys}")
         return [feature_builders]
 
     def forward(self, features: Dict[str, torch.Tensor], targets=None, tokens_list=None) -> Dict[str, torch.Tensor]:
@@ -382,7 +392,8 @@ class ReCogDriveAgent(AbstractAgent):
 
         features: Dict[str, torch.Tensor] = {}
         # build features
-        if not self.evaluation:
+        # if not self.evaluation:
+        if self.evaluation:
             for builder in self.feature_builders:
                 features.update(builder.compute_features(agent_input))
         
@@ -483,7 +494,7 @@ class ReCogDriveAgent(AbstractAgent):
         if self.grpo:
             scheduler = WarmupCosLR(optimizer=optimizer, lr=self._lr, min_lr=0.0, epochs=10, warmup_epochs=0)
         else:
-            scheduler = WarmupCosLR(optimizer=optimizer, lr=self._lr, min_lr=1e-6, epochs=10, warmup_epochs=0)
+            scheduler = WarmupCosLR(optimizer=optimizer, lr=self._lr, min_lr=1e-6, epochs=100, warmup_epochs=3)
             
         return {'optimizer': optimizer, 'lr_scheduler': scheduler}
 

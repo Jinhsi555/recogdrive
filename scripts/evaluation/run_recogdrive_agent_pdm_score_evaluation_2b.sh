@@ -24,7 +24,7 @@ echo "GPUS: ${GPUS}"
 export CUDA_LAUNCH_BLOCKING=1
 
 
-CHECKPOINT="/mnt/data/data/wlb/ReCogDrive_github/exp/training_recogdrive_agent_qwen3vl_worldmirror_alignment_5epoch/2025.12.24.18.57.16/lightning_logs/version_0/checkpoints/epoch=83-step=55860.ckpt"
+CHECKPOINT="/mnt/data/data/wlb/ReCogDrive_github/exp/training_qwen3vl_backbone_agent_dit_alignment_10epoch_LoRA_batchsize_1/2025.12.26.03.37.55/lightning_logs/version_0/checkpoints/epoch=9-step=106390.ckpt"
 
 
 # 1. Set NAVSIM dataset and related environment variables
@@ -39,7 +39,6 @@ torchrun \
     train_test_split=$TRAIN_TEST_SPLIT \
     agent=recogdrive_agent \
     agent.checkpoint_path="'$CHECKPOINT'" \
-    agent.vlm_checkpoint="'/mnt/data/data/wlb/ReCogDrive_github/exp/training_qwen3vl_backbone_agent_dit_alignment_10epoch/2025.12.23.16.31.18/lightning_logs/version_0/checkpoints/epoch=6-step=74473.ckpt'" \
     agent.vlm_path='/mnt/data/data/wlb/Qwen3-VL-2B-Instruct' \
     agent.cam_type='single' \
     agent.grpo=False \
@@ -49,8 +48,8 @@ torchrun \
     agent.dit_type="small" \
     agent.vlm_size="small" \
     agent.sampling_method="ddim" \
-    agent.is_evaluation=True \
-    cache_path="/mnt/data/data/wlb/ReCogDrive_github/exp/recogdrive_agent_cache_dir_test_qwen3vl_worldmirror_alignment_5epoch" \
+    cache_path="/mnt/data/data/wlb/ReCogDrive_github/exp/recogdrive_agent_cache_dir_train_qwen3vl_worldmirror_alignment_10epoch_LoRA" \
     experiment_name=recogdrive_agent_eval \
-    agent.evaluation=True
+    agent.evaluation=True \
+    agent.use_lora=True
 

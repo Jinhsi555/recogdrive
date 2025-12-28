@@ -4,7 +4,7 @@ export NUPLAN_MAPS_ROOT="/mnt/data/data/wlb/ReCogDrive_github/dataset/maps"
 export NAVSIM_EXP_ROOT="/mnt/data/data/wlb/ReCogDrive_github/exp"
 export NAVSIM_DEVKIT_ROOT="/mnt/data/data/wlb/ReCogDrive_github"
 export OPENSCENE_DATA_ROOT="/mnt/data/data/wlb/ReCogDrive_github/dataset"
-CACHE_PATH=$NAVSIM_EXP_ROOT/recogdrive_agent_cache_dir_train_qwen3vl_worldmirror_alignment_10epoch
+CACHE_PATH=$NAVSIM_EXP_ROOT/recogdrive_agent_cache_dir_train_qwen3vl_worldmirror_alignment_10epoch_LoRA_batchsize_8
 
 export NCCL_IB_DISABLE=0
 export NCCL_P2P_DISABLE=0
@@ -37,6 +37,6 @@ torchrun \
     agent.vlm_type="qwen3vl" \
     train_test_split=$TRAIN_TEST_SPLIT \
     agent.vlm_path="/mnt/data/data/wlb/Qwen3-VL-2B-Instruct" \
-    agent.checkpoint_path="'/mnt/data/data/wlb/ReCogDrive_github/exp/training_qwen3vl_backbone_agent_dit_new_cache/2025.12.23.16.31.18/lightning_logs/version_0/checkpoints/epoch=9-step=106390.ckpt'" \
+    agent.checkpoint_path="'/mnt/data/data/wlb/ReCogDrive_github/exp/training_qwen3vl_backbone_agent_dit_alignment_10epoch_LoRA_batchsize_8/2025.12.26.03.37.55/lightning_logs/version_0/checkpoints/epoch=9-step=106390.ckpt'" \
     cache_path=$CACHE_PATH
     # > caching_dataset.txt 2>&1
