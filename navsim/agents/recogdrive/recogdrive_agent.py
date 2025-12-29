@@ -384,7 +384,7 @@ class ReCogDriveAgent(AbstractAgent):
             action_inputs = BatchFeature(data={"state": input_state.to(model_dtype), "his_traj": history_trajectory_reshaped.to(model_dtype), "status_feature": status_feature.to(model_dtype), "action": targets["trajectory"].to(model_dtype)})
             return self.action_head.forward_grpo(last_hidden_state, action_inputs, tokens_list)
         else: 
-            action_inputs = BatchFeature({"state": input_state.to(model_dtype), "his_traj": history_trajectory_reshaped.to(model_dtype), "status_feature": status_feature.to(model_dtype)})
+            # action_inputs = BatchFeature({"state": input_state.to(model_dtype), "his_traj": history_trajectory_reshaped.to(model_dtype), "status_feature": status_feature.to(model_dtype)})
             return self.action_head.get_action(last_hidden_state.to(model_dtype), action_inputs)
 
     def compute_trajectory(self, agent_input: AgentInput) -> Trajectory:
@@ -429,9 +429,9 @@ class ReCogDriveAgent(AbstractAgent):
         if self.training and self.grpo:
             return predictions
         elif self.training:
-            return predictions.loss
+            return predictions.action_loss, predictions.alignment_loss
         else:
-            return torch.nn.functional.l1_loss(predictions["pred_traj"], targets["trajectory"])
+            return torch.nn.functional.l1_loss(predictions["pred_traj"], targets["trajectory"]), predictions.alignment_loss
 
     def get_optimizers(self) -> Union[Optimizer, Dict[str, LRScheduler]]:
         """

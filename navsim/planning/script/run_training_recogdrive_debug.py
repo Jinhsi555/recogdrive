@@ -7,7 +7,6 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
-from pytorch_lightning.strategies import DDPStrategy
 import torch.distributed as dist
 from navsim.agents.abstract_agent import AbstractAgent
 from navsim.common.dataclasses import SceneFilter
@@ -17,6 +16,8 @@ from navsim.planning.training.agent_lightning_module import AgentLightningModule
 import torch
 import torch.nn.utils.rnn as rnn_utils
 from typing import List, Dict
+from callback import EMA, EMAModelCheckpoint
+import pytorch_lightning.callbacks as plc
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,34 @@ CONFIG_PATH = "config/training"
 CONFIG_NAME = "default_training"
 
 
+def load_callbacks():
+    callbacks = []
+    
+    use_ema = True
+    if use_ema:
+        callbacks.append(EMAModelCheckpoint(
+            monitor='val/loss_epoch',
+            mode='min',
+            save_last=True,
+            save_on_train_epoch_end=True,
+            save_top_k=10,
+            every_n_epochs=1
+        ))
+        callbacks.append(EMA(decay=0.999))
+    else:
+        callbacks.append(plc.ModelCheckpoint(
+            monitor='val/loss_epoch',
+            mode='min',
+            save_last=True,
+            save_on_train_epoch_end=True,
+            save_top_k=5,
+            every_n_epochs=1
+        ))
+
+    callbacks.append(plc.LearningRateMonitor(logging_interval='epoch'))
+
+
+    return callbacks
 
 
 def custom_collate_fn(
@@ -145,7 +174,7 @@ def main(cfg: DictConfig) -> None:
 
     logger.info("Building Agent")
     agent: AbstractAgent = instantiate(cfg.agent)
-    agent.initialize()
+    # agent.initialize()
 
     logger.info("Building Lightning Module")
     lightning_module = AgentLightningModule(
@@ -164,13 +193,13 @@ def main(cfg: DictConfig) -> None:
             cache_path=cfg.cache_path,
             feature_builders=agent.get_feature_builders(),
             target_builders=agent.get_target_builders(),
-            log_names=cfg.train_logs[:2],
+            log_names=cfg.train_logs[:1],
         )
         val_data = CacheOnlyDataset(
             cache_path=cfg.cache_path,
             feature_builders=agent.get_feature_builders(),
             target_builders=agent.get_target_builders(),
-            log_names=cfg.val_logs[:20],
+            log_names=cfg.val_logs[:50],
         )
     else:
         logger.info("Building SceneLoader")
@@ -183,11 +212,7 @@ def main(cfg: DictConfig) -> None:
     logger.info("Num validation samples: %d", len(val_data))
 
     logger.info("Building Trainer")
-    strategy = DDPStrategy(
-        find_unused_parameters=False,
-        timeout=3600,
-    )
-    trainer = pl.Trainer(**cfg.trainer.params, strategy=strategy, callbacks=[pl.callbacks.ModelCheckpoint(monitor="val/loss_epoch",mode='min', save_top_k=5,every_n_epochs=1)])
+    trainer = pl.Trainer(**cfg.trainer.params, callbacks=load_callbacks())
 
     logger.info("Starting Training")
     trainer.fit(

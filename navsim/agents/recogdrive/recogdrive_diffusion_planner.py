@@ -509,7 +509,7 @@ class ReCogDriveDiffusionPlanner(nn.Module):
             
             model_output = self.model(fused_input, vl_embeds, ego_status_features, t_discrete)
             pred_noise = self.action_decoder(model_output)
-            loss = F.mse_loss(pred_noise, noise, reduction='mean')
+            action_loss = F.mse_loss(pred_noise, noise, reduction='mean')
         
         if action_input.get("geometry_feature") is not None:
             alignment_feature = action_input.get("alignment_feature")
@@ -521,11 +521,11 @@ class ReCogDriveDiffusionPlanner(nn.Module):
             geometry_feature = F.interpolate(geometry_feature, size=(34, 60), mode='bilinear', align_corners=True).permute(0, 2, 3, 1).view(B*N, -1, C)
         
             # compute alignment loss
-            align_loss = self.compute_alignment_loss(geometry_feature, alignment_feature)
-            loss += 0.5 * align_loss
-            
-        return BatchFeature(data={"loss": loss})
+            alignment_loss = self.compute_alignment_loss(geometry_feature, alignment_feature)
+            return BatchFeature(data={"action_loss": action_loss, "alignment_loss": alignment_loss})
 
+        return BatchFeature(data={"action_loss": action_loss, "alignment_loss": None})
+        
     def compute_alignment_loss(self, geometry_feature: torch.Tensor, alignment_feature: torch.Tensor) -> torch.Tensor:
         align_loss = 0
         bsz = alignment_feature.shape[0]
@@ -663,7 +663,20 @@ class ReCogDriveDiffusionPlanner(nn.Module):
 
         final_actions = self.denorm_odo(current_actions)
 
-        return BatchFeature(data={"pred_traj": final_actions})
+        if action_input.get("geometry_feature") is not None:
+            alignment_feature = action_input.get("alignment_feature")
+            geometry_feature = action_input.get("geometry_feature")
+            B, N, H, W, C = geometry_feature.shape
+            geometry_feature = geometry_feature.permute(0, 1, 4, 2, 3).view(B*N, C, H, W)
+        
+            # interpolate the geometry feature map to match the size of alignment feature map
+            geometry_feature = F.interpolate(geometry_feature, size=(34, 60), mode='bilinear', align_corners=True).permute(0, 2, 3, 1).view(B*N, -1, C)
+        
+            # compute alignment loss
+            alignment_loss = self.compute_alignment_loss(geometry_feature, alignment_feature)
+
+        return BatchFeature(data={"pred_traj": final_actions,
+                                  "alignment_loss": alignment_loss})
 
     def sample_chain(
         self,

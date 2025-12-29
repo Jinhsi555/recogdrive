@@ -35,7 +35,7 @@ def load_callbacks():
             mode='min',
             save_last=True,
             save_on_train_epoch_end=True,
-            save_top_k=5,
+            save_top_k=10,
             every_n_epochs=1
         ))
         callbacks.append(EMA(decay=0.999))
@@ -174,7 +174,7 @@ def main(cfg: DictConfig) -> None:
 
     logger.info("Building Agent")
     agent: AbstractAgent = instantiate(cfg.agent)
-    agent.initialize()
+    # agent.initialize()
 
     logger.info("Building Lightning Module")
     lightning_module = AgentLightningModule(

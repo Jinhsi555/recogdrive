@@ -27,9 +27,14 @@ class AgentLightningModule(pl.LightningModule):
         features, targets, tokens_list = batch
         prediction = self.agent.forward(features,targets,tokens_list)
         #prediction = self.agent.forward(features,targets)
-        loss = self.agent.compute_loss(features, targets, prediction)
+        action_loss, alignment_loss = self.agent.compute_loss(features, targets, prediction)
+        loss = action_loss + 0.5 * alignment_loss
+        self.log(f"{logging_prefix}/action_loss", action_loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f"{logging_prefix}/alignment_loss", alignment_loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log(f"{logging_prefix}/loss", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-        
+        print(f"[{logging_prefix}] action_loss: {action_loss.item():.4f}, "
+            f"alignment_loss: {alignment_loss.item():.4f}, "
+            f"total_loss: {loss.item():.4f}")
         return loss
     
     # def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:

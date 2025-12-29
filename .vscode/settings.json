@@ -1,0 +1,17 @@
+{
+    "python.defaultInterpreterPath": "/vepfs-mlp2/c20250502/haoce/conda_env/recogdrive/bin/python",
+
+    "python.autoComplete.extraPaths": [
+        "/vepfs-mlp2/c20250502/haoce/wlb/recogdrive",
+        "/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/HunyuanWorld-Mirror",
+    ],
+
+    "python.languageServer": "Jedi",
+    "python.analysis.extraPaths": [
+        "/vepfs-mlp2/c20250502/haoce/wlb/recogdrive",
+        "/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/HunyuanWorld-Mirror",
+    ],
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.cwd": "/vepfs-mlp2/c20250502/haoce/wlb/recogdrive",
+
+}

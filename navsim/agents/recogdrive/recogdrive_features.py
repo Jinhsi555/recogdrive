@@ -58,7 +58,7 @@ class ReCogDriveFeatureBuilder(AbstractFeatureBuilder):
             )
         
         if not self.cache_hidden_state and self.cache_mode:
-            self.geometry_backbone = WorldMirror.from_pretrained("/mnt/data/data/wlb/recogdrive/checkpoints/HunyuanWorld-Mirror").to(device).eval()
+            self.geometry_backbone = WorldMirror.from_pretrained("/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/checkpoints/HunyuanWorld-Mirror").to(device).eval()
             if self.geometry_backbone:
                 print("Geometry Backbone Loaded")
 
