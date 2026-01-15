@@ -6,7 +6,7 @@
         "/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/HunyuanWorld-Mirror",
     ],
 
-    "python.languageServer": "Jedi",
+    "python.languageServer": "None",
     "python.analysis.extraPaths": [
         "/vepfs-mlp2/c20250502/haoce/wlb/recogdrive",
         "/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/HunyuanWorld-Mirror",

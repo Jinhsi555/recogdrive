@@ -3,7 +3,7 @@ export NUPLAN_MAPS_ROOT="/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/dataset/maps
 export NAVSIM_EXP_ROOT="/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/exp"
 export NAVSIM_DEVKIT_ROOT="/vepfs-mlp2/c20250502/haoce/wlb/recogdrive"
 export OPENSCENE_DATA_ROOT="/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/dataset"
-export PYTHONPATH="/mnt/data/data/wlb/ReCogDrive_github/HunyuanWorld-Mirror:/mnt/data/data/wlb/ReCogDrive_github:${PYTHONPATH}"
+export PYTHONPATH="/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/HunyuanWorld-Mirror:${PYTHONPATH}"
 TRAIN_TEST_SPLIT=navtrain
 export NCCL_IB_DISABLE=0
 export NCCL_P2P_DISABLE=0
@@ -37,8 +37,8 @@ torchrun \
     agent=recogdrive_agent \
     agent.lr=1e-4 \
     agent.grpo=False \
-    agent.vlm_path='/mnt/data/data/wlb/Qwen3-VL-2B-Instruct' \
-    agent.checkpoint_path="'/mnt/data/data/wlb/ReCogDrive_github/exp/training_qwen3vl_backbone_agent_dit_alignment_10epoch_LoRA_batchsize_8/2025.12.26.03.37.55/lightning_logs/version_0/checkpoints/epoch=9-step=106390.ckpt'" \
+    agent.vlm_path='/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/checkpoints/Qwen3-VL-2B-Instruct' \
+    agent.checkpoint_path="'/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/exp/exp_mlp_public/training_qwen3vl_backbone_agent_dit_alignment_100epoch_LoRA_batchsize_128/checkpoints_128/lightning_logs/version_0/checkpoints/epoch=59-step=39900-EMA.ckpt'" \
     agent.cam_type='single' \
     agent.cache_hidden_state=True \
     agent.cache_mode=False \
@@ -47,12 +47,14 @@ torchrun \
     agent.dit_type="small" \
     agent.vlm_size="small" \
     agent.sampling_method="ddim" \
+    agent.use_lora=True \
     trainer.params.max_epochs=100 \
-    trainer.params.num_nodes=1 \
+    trainer.params.num_nodes=$MLP_WORKER_NUM \
     trainer.params.devices=8 \
-    experiment_name=training_recogdrive_agent_qwen3vl_worldmirror_alignment_10epoch_LoRA_batchsize_128 \
+    dataloader.params.batch_size=4 \
+    experiment_name=training_recogdrive_agent_qwen3vl_worldmirror_alignment_60epoch_LoRA_batchsize_128_post_100epoch \
     train_test_split=$TRAIN_TEST_SPLIT \
-    cache_path="/mnt/data/data/wlb/ReCogDrive_github/exp/recogdrive_agent_cache_dir_train_qwen3vl_worldmirror_alignment_10epoch_LoRA_batchsize_8" \
+    cache_path="/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/exp/exp_mlp_public/recogdrive_agent_cache_dir_train_qwen3vl_worldmirror_alignment_60epoch_LoRA_batchsize_128" \
     use_cache_without_dataset=True \
     force_cache_computation=False
     # > train_recogdrive_exp_ema_2b.txt &

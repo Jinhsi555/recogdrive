@@ -30,8 +30,8 @@ class ReCogDriveAgent(AbstractAgent):
         self,
         trajectory_sampling: TrajectorySampling,
         vlm_path: Optional[str] = None,
-        vlm_checkpoint: Optional[str] = None,
         checkpoint_path: Optional[str] = None,
+        action_head_checkpoint_path = None,
         cam_type: Optional[str] = 'single', 
         vlm_type: Optional[str] = 'internvl', 
         dit_type: Optional[str] = 'small', 
@@ -55,7 +55,7 @@ class ReCogDriveAgent(AbstractAgent):
         super().__init__()
         self._trajectory_sampling = trajectory_sampling
         self.vlm_path = vlm_path
-        self.vlm_checkpoint = vlm_checkpoint
+        self.action_head_checkpoint_path = action_head_checkpoint_path
         self.checkpoint_path = checkpoint_path
         self.vlm_type = vlm_type
         self.dit_type = dit_type
@@ -199,8 +199,8 @@ class ReCogDriveAgent(AbstractAgent):
         print(f"📊 Backbone参数统计: {trainable_params:,}/{total_params:,} 可训练")
 
     def initialize(self) -> None:
-        if self.checkpoint_path:
-            ckpt = torch.load(self.checkpoint_path, map_location="cpu")["state_dict"]
+        if self.action_head_checkpoint_path:
+            ckpt = torch.load(self.action_head_checkpoint_path, map_location="cpu")["state_dict"]
             model_dict = self.state_dict()
             filtered_ckpt = {}
             for k, v in ckpt.items():
@@ -208,7 +208,7 @@ class ReCogDriveAgent(AbstractAgent):
                 if k2 in model_dict and v.shape == model_dict[k2].shape:
                     filtered_ckpt[k2] = v
             self.load_state_dict(filtered_ckpt, strict=False)
-            print(f"✅ Agent action head loaded from checkpoint: {self.checkpoint_path}")
+            print(f"✅ Agent action head loaded from checkpoint: {self.action_head_checkpoint_path}")
             
         if not self.freeze_backbone:
             self._freeze_backbone()
@@ -376,6 +376,12 @@ class ReCogDriveAgent(AbstractAgent):
                 "his_traj": history_trajectory_reshaped.to(model_dtype), 
                 "status_feature": status_feature.to(model_dtype), 
                 "action": targets["trajectory"].to(model_dtype),
+            })
+        else:
+            action_inputs = BatchFeature(data={
+                "state": input_state.to(model_dtype), 
+                "his_traj": history_trajectory_reshaped.to(model_dtype), 
+                "status_feature": status_feature.to(model_dtype), 
             })
 
         if self.training and not self.grpo:

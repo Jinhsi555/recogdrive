@@ -81,16 +81,16 @@ class CustomQwen3VL(Qwen3VLForConditionalGeneration):
 # 使用示例
 def main():
     # 1. 使用自定义类加载模型
-    config = AutoConfig.from_pretrained("/mnt/data/data/wlb/Qwen3-VL-2B-Instruct")
+    config = AutoConfig.from_pretrained("/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/checkpoints/Qwen3-VL-2B-Instruct")
     model = CustomQwen3VL.from_pretrained(
-        "/mnt/data/data/wlb/Qwen3-VL-2B-Instruct",
+        "/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/checkpoints/Qwen3-VL-2B-Instruct",
         config=config,
         torch_dtype="auto",
         device_map="auto",
         attn_implementation="flash_attention_2",
     )
     
-    processor = AutoProcessor.from_pretrained("/mnt/data/data/wlb/Qwen3-VL-2B-Instruct")
+    processor = AutoProcessor.from_pretrained("/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/checkpoints/Qwen3-VL-2B-Instruct")
     
     messages = [
         {
@@ -115,9 +115,12 @@ def main():
         do_resize=False, 
         padding=True, 
         return_tensors="pt"
-    )
-    
-    outputs = model(**inputs, output_hidden_states=True, return_dict=True)
+    ).to(model.device)
+    i=0
+    while True:
+        print(f'step{i}\n')
+        outputs = model(**inputs, output_hidden_states=True, return_dict=True)
+        i = i + 1
     print(outputs)
     print(f"Custom attribute: {outputs.custom_attribute}")
 

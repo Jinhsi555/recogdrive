@@ -1,3 +1,4 @@
+
 from typing import Tuple
 from pathlib import Path
 import logging
@@ -193,13 +194,13 @@ def main(cfg: DictConfig) -> None:
             cache_path=cfg.cache_path,
             feature_builders=agent.get_feature_builders(),
             target_builders=agent.get_target_builders(),
-            log_names=cfg.train_logs[:1],
+            log_names=cfg.train_logs,
         )
         val_data = CacheOnlyDataset(
             cache_path=cfg.cache_path,
             feature_builders=agent.get_feature_builders(),
             target_builders=agent.get_target_builders(),
-            log_names=cfg.val_logs[:50],
+            log_names=cfg.val_logs,
         )
     else:
         logger.info("Building SceneLoader")

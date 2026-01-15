@@ -24,7 +24,7 @@ echo "GPUS: ${GPUS}"
 export CUDA_LAUNCH_BLOCKING=1
 
 
-CHECKPOINT="/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/exp/exp_mlp_public/training_qwen3vl_backbone_agent_dit_alignment_100epoch_LoRA_batchsize_32/2025.12.29.21.17.32/lightning_logs/version_0/checkpoints/epoch=14-step=39900.ckpt"
+CHECKPOINT="/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/exp/exp_mlp_public/training_qwen3vl_backbone_agent_dit_alignment_100epoch_LoRA_batchsize_32/checkpoints_32/lightning_logs/version_0/checkpoints/epoch=44-step=119700-EMA.ckpt"
 
 
 # 1. Set NAVSIM dataset and related environment variables
@@ -34,11 +34,16 @@ CHECKPOINT="/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/exp/exp_mlp_public/traini
 
 
 torchrun \
+    --nnodes=$MLP_WORKER_NUM \
     --nproc_per_node=8 \
+    --node_rank=$MLP_ROLE_INDEX \
+    --master_addr=$MLP_WORKER_0_HOST \
+    --master_port=$MLP_WORKER_0_PORT \
     $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_recogdrive.py \
     train_test_split=$TRAIN_TEST_SPLIT \
     agent=recogdrive_agent \
     agent.checkpoint_path="'$CHECKPOINT'" \
+    agent.action_head_checkpoint_path="'/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/exp/training_recogdrive_agent_qwen3vl_worldmirror_alignment_45epoch_LoRA_batchsize_32_post_100epoch/2026.01.02.12.33.21/lightning_logs/version_0/checkpoints/epoch=99-step=66500-EMA.ckpt'" \
     agent.vlm_path='/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/checkpoints/Qwen3-VL-2B-Instruct' \
     agent.cam_type='single' \
     agent.grpo=False \
@@ -48,7 +53,7 @@ torchrun \
     agent.dit_type="small" \
     agent.vlm_size="small" \
     agent.sampling_method="ddim" \
-    experiment_name='recogdrive_agent_eval/batchsize_32_epoch14' \
+    experiment_name='recogdrive_agent_eval/batchsize_32_post-training_epoch100' \
     agent.evaluation=True \
     agent.use_lora=True \
     metric_cache_path='/vepfs-mlp2/c20250502/haoce/wlb/recogdrive/exp/exp_mlp_public/metric_cache'

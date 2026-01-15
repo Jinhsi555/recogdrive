@@ -7,8 +7,8 @@ trajectory_sampling:
   time_horizon: 4
   interval_length: 0.5
 checkpoint_path: ''
-vlm_checkpoint: ''
 vlm_path: ''
+action_head_checkpoint_path: ''
 cam_type: 'single'
 vlm_type: 'internvl'
 dit_type: 'small'

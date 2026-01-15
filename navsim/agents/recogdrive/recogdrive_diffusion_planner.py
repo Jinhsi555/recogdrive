@@ -675,8 +675,11 @@ class ReCogDriveDiffusionPlanner(nn.Module):
             # compute alignment loss
             alignment_loss = self.compute_alignment_loss(geometry_feature, alignment_feature)
 
-        return BatchFeature(data={"pred_traj": final_actions,
-                                  "alignment_loss": alignment_loss})
+            return BatchFeature(data={"pred_traj": final_actions,
+                                    "alignment_loss": alignment_loss})
+        else:
+            return BatchFeature(data={"pred_traj": final_actions,
+                                    "alignment_loss": None})
 
     def sample_chain(
         self,
